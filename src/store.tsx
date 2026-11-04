@@ -289,6 +289,16 @@ function useProvideStore() {
     deleteContact: (id: string) => mutate(d => { d.contacts = d.contacts.filter(x => x.id !== id); }),
     updateRepo: (id: string, patch: Partial<AppState["repos"][number]>) => mutate(d => { const r = d.repos.find(x => x.id === id)!; Object.assign(r, patch); log(d, { entity: "repo", entityId: id, action: "Repository details updated", to: r.name }); }),
 
+    // ── dependency cycle decisions (recorded, never applied to deps)
+    setCycleDecision: (key: string, patch: Partial<import("./types").CycleDecision>, label: string) => mutate(d => {
+      d.cycleDecisions = d.cycleDecisions || {};
+      const prev = d.cycleDecisions[key] || { key, status: "undecided" as const };
+      const next = { ...prev, ...patch, key, at: nowIso(), by: d.me || "system" };
+      d.cycleDecisions[key] = next;
+      log(d, { entity: "plan", entityId: "cycle:" + key, action: `Dependency loop: ${label}`, from: prev.status, to: next.status, reason: patch.note });
+      if (patch.ownerId && patch.ownerId !== prev.ownerId) notify(d, patch.ownerId, "review", "A dependency loop needs your decision", label);
+    }),
+
     // ── graph
     setPos: (id: string, x: number, y: number) => mutate(d => { d.graphPos[id] = { x, y }; }),
     resetPos: () => mutate(d => { d.graphPos = {}; }),

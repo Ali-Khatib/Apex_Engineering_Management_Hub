@@ -163,6 +163,6 @@ export function seedState(): AppState {
     },
     contacts,
     plan: { notes: "## First review pass\n\n1. Select a proof workflow and reuse the smallest necessary set.\n2. Reconcile C/SP, PN/ADD and P/catalog overlaps.\n3. Approve contract owner, typed schemas, deployment/data boundary and acceptance evidence.\n4. Place contributors into bounded packages with dependencies and fixtures available.\n5. Verify independent QA, consumer integration, rollback and documentation on exact artifacts.\n\n_From the Component Design Library README, 20 October 2026._", updatedAt: IMPORTED, updatedBy: "ali" },
-    graphPos: {}, me: null,
+    graphPos: {}, cycleDecisions: {}, me: null,
   });
 }

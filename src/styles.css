@@ -2268,3 +2268,38 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .qa-steps li::before { content: counter(q); position: absolute; left: 0; top: 0; width: 21px; height: 21px; display: grid; place-items: center; border-radius: 50%; background: var(--brand-wash); color: var(--brand-ink); font-size: 11px; font-weight: 600; }
 .qa-steps b { font-size: 13.5px; font-weight: 600; color: var(--fg); }
 .qa-steps span { font-size: 13px; line-height: 1.6; color: var(--fg-3); max-width: 86ch; }
+
+/* ───────── Dependency loop decisions ───────── */
+.cyclist { display: grid; }
+.cyc { border-bottom: 1px solid var(--line); border-left: 3px solid var(--warn); }
+.cyc:last-child { border-bottom: 0; }
+.cyc.st-decided { border-left-color: var(--ok); }
+.cyc.st-under_review { border-left-color: var(--info); }
+.cyc.st-deferred { border-left-color: var(--fg-4); }
+.cyc-head { display: flex; align-items: center; gap: 9px; width: 100%; padding: 11px 16px 4px; border: 0; background: none; text-align: left; }
+.cyc-head b { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 500; color: var(--fg); }
+.cyc-head svg { flex: none; color: var(--fg-4); transition: transform 160ms var(--ease); }
+.cyc-head[aria-expanded="true"] svg { transform: rotate(90deg); }
+.cyc:hover .cyc-head b { color: var(--brand-ink); }
+.cyc-chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 16px 12px 38px; font-size: 12px; color: var(--fg-4); }
+.cyc-node { font-family: var(--font-mono); font-size: 11.5px; padding: 2px 7px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line); color: var(--fg-2); }
+.cyc-node:hover { border-color: var(--brand); color: var(--brand-ink); text-decoration: none; }
+.cyc-chain-note { margin-left: 4px; }
+.cyc-body { display: grid; gap: 16px; padding: 4px 16px 18px 38px; }
+.cyc-why h5 { margin: 0 0 6px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-4); }
+.cyc-why p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--fg-2); max-width: 84ch; }
+.cyc-opts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cyc-opts li { display: grid; gap: 2px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+.cyc-opts li.chosen { border-color: var(--ok); background: var(--ok-bg); }
+.cyc-opts b { font-size: 13px; font-weight: 600; color: var(--fg); display: flex; align-items: center; gap: 8px; }
+.cyc-opts b em { font-style: normal; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: var(--r-pill); background: var(--ok); color: var(--surface); }
+.cyc-opts span { font-size: 12.5px; line-height: 1.5; color: var(--fg-2); }
+.cyc-opts small { font-size: 12px; color: var(--fg-4); }
+.cyc-warn { display: flex; align-items: flex-start; gap: 7px; margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--fg-3); max-width: 84ch; }
+.cyc-warn svg { flex: none; margin-top: 2px; color: var(--warn); }
+.cyc-dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 20px; }
+.cyc-dl > div { display: grid; gap: 2px; }
+.cyc-dl-wide { grid-column: 1 / -1; }
+.cyc-dl dt { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-4); }
+.cyc-dl dd { margin: 0; font-size: 13px; color: var(--fg-2); }
+.cyc-dl em { font-style: normal; color: var(--fg-4); }

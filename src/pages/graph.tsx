@@ -3,6 +3,7 @@ import { useStore, useNav } from "../store";
 import { Icon } from "../icons";
 import { PageHeader, Empty, cx } from "../ui";
 import { LayerOfTag, WaveTag } from "./lib";
+import { CycleCard } from "./cycles";
 import type { Component } from "../types";
 
 /**
@@ -132,17 +133,9 @@ export function Graph() {
             These components each need the other, so neither can be finished first. Somebody has to decide
             which dependency to drop or split.
           </p>
-          <div className="list">
+          <div className="cyclist">
             {loops.length === 0 && <Empty icon="check" title="No circular dependencies" />}
-            {loops.slice(0, showLoops).map(l => (
-              <button key={l.key} className="li3 li3-plain" onClick={() => setOpen(l.ids[0])}>
-                <span className="li3-main">
-                  <b>{l.ids.map(id => component(id)?.name || id).join(l.ids.length === 2 ? " and " : " → ")}</b>
-                  <small>{l.ids.length === 2 ? "each needs the other" : `a ring of ${l.ids.length}`} · {l.ids.join(" → ")} → {l.ids[0]}</small>
-                </span>
-                <Icon name="arrowRight" size={14} />
-              </button>
-            ))}
+            {loops.slice(0, showLoops).map(l => <CycleCard key={l.key} loop={l} />)}
           </div>
           {showLoops < loops.length && (
             <div style={{ padding: "4px 18px 16px" }}>

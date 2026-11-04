@@ -119,6 +119,25 @@ export interface Notice {
 
 export interface Contact { id: string; topic: string; description: string; personId: string; channel: string; }
 
+/**
+ * A decision about a dependency cycle. Recording one never changes the
+ * dependency records: the loop stays in the data exactly as the source sheet
+ * describes it until somebody edits the component itself. This is the minute
+ * of the decision, not its execution.
+ */
+export type CycleResolution = "drop_dependency" | "split_component" | "introduce_interface" | "shared_prerequisite" | "resequence";
+export type CycleStatus = "undecided" | "under_review" | "decided" | "deferred";
+export interface CycleDecision {
+  key: string;                 // the loop's member set, sorted and joined
+  status: CycleStatus;
+  resolution?: CycleResolution;
+  dropEdge?: { from: string; to: string };  // recorded only, never applied
+  ownerId?: string | null;     // who has to make the call
+  note?: string;
+  at?: string;
+  by?: string;
+}
+
 export interface AppState {
   version: number;
   people: Person[]; projects: Project[]; modules: Module[]; components: Component[]; repos: Repo[];
@@ -128,5 +147,7 @@ export interface AppState {
   contacts: Contact[];
   plan: { notes: string; updatedAt: string; updatedBy: string };
   graphPos: Record<string, { x: number; y: number }>;
+  /** Keyed by cycle key. Additive: absent means nobody has looked at it yet. */
+  cycleDecisions?: Record<string, CycleDecision>;
   me: string | null;
 }

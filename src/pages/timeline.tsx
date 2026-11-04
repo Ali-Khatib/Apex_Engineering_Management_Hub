@@ -20,8 +20,10 @@ import type { Component } from "../types";
  */
 
 const ZOOMS = [21, 45, 90, 180, 365];
-const LBL = 224;   // label column, px. Fixed so the arrow overlay can do maths.
+const LBL = 268;   // label column, px. Fixed so the arrow overlay can do maths.
 const ROW = 34;
+
+type Link = { key: string; late: boolean; d: string; span: { y: number; x1: number; x2: number } | null };
 
 const startOfDay = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const monthsIn = (from: number, to: number) => {
@@ -95,26 +97,63 @@ export function Timeline({ rows, unscheduled, showDeps, chain, note }: {
    *
    * With a row selected, only that row's links are drawn.
    */
-  const { edges, lateCount } = useMemo(() => {
+  /**
+   * Dependencies, drawn for the component you select rather than all at once.
+   *
+   * A forward arrow cannot be drawn for most of these. Every prerequisite in
+   * this library is due to finish AFTER the work that needs it is meant to
+   * start, so an arrow would run backwards across the whole chart. Hiding that
+   * made the chart look tidy and say nothing.
+   *
+   * So selecting a row does three things: marks its prerequisites and the work
+   * waiting on it, connects them, and draws the overlap in red where a
+   * prerequisite finishes late. The red span is the finding, not a defect in
+   * the drawing.
+   */
+  const rel = useMemo(() => {
+    const empty = { needs: new Set<string>(), feeds: new Set<string>(), links: [] as Link[] };
+    if (!sel) return empty;
     const idx = new Map(visible.map((c, i) => [c.id, i]));
+    const me = visible.find(c => c.id === sel);
+    if (!me) return empty;
     const trackW = Math.max(0, w - LBL);
-    const x = (t: number) => LBL + (pct(t) / 100) * trackW;
-    const out: { d: string; key: string }[] = [];
-    let late = 0;
-    for (const c of visible) for (const dep of c.deps) {
-      const i = idx.get(dep), j = idx.get(c.id);
-      if (i === undefined || j === undefined) continue;
-      const p = visible[i];
-      if (dayOf(p.due) > dayOf(c.start)) { late++; continue; }
-      if (!arrows || w < 520) continue;
-      if (sel && sel !== c.id && sel !== p.id) continue;
-      const x1 = x(dayOf(p.due)), y1 = i * ROW + ROW / 2;
-      const x2 = x(dayOf(c.start)), y2 = j * ROW + ROW / 2;
-      const mid = Math.max(x1 + 8, x2 - 12);
-      out.push({ key: dep + ">" + c.id, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
-    }
-    return { edges: out, lateCount: late };
-  }, [arrows, visible, w, from, to, sel]);
+    // Track coordinates. The overlay is offset to the track in CSS, so the
+    // label column is not part of this scale.
+    const x = (t: number) => (pct(t) / 100) * trackW;
+    const yOf = (i: number) => i * ROW + ROW / 2;
+
+    const needs = new Set(me.deps.filter(d => idx.has(d)));
+    const feeds = new Set(visible.filter(c => c.deps.includes(me.id)).map(c => c.id));
+    const links: Link[] = [];
+
+    const add = (from: Component, to: Component) => {
+      const i = idx.get(from.id)!, j = idx.get(to.id)!;
+      const x1 = x(dayOf(from.due)), x2 = x(dayOf(to.start));
+      const late = dayOf(from.due) > dayOf(to.start);
+      links.push({
+        key: from.id + ">" + to.id, late,
+        // A line joining two bars that overlap in time has nowhere to go but
+        // backwards, and a backwards line reads as a stray mark. The overlap
+        // itself is the fact worth drawing: the stretch of the prerequisite
+        // that happens after the work needing it was meant to begin. It sits
+        // on the prerequisite's own row, under its own bar.
+        d: late ? "" : `M${x1} ${yOf(i)} H${Math.max(x1 + 8, x2 - 12)} V${yOf(j)} H${x2}`,
+        span: late ? { y: yOf(i), x1: x2, x2: x1 } : null,
+      });
+    };
+    for (const d of needs) add(visible.find(c => c.id === d)!, me);
+    for (const f of feeds) add(me, visible.find(c => c.id === f)!);
+    return { needs, feeds, links: w < 520 ? [] : links };
+  }, [sel, visible, w, from, to]);
+
+  /** Shown on every row so dependencies are legible without selecting anything. */
+  const counts = useMemo(() => {
+    const inSet = new Set(rows.map(c => c.id));
+    const m = new Map<string, { needs: number; feeds: number }>();
+    for (const c of rows) m.set(c.id, { needs: c.deps.filter(d => inSet.has(d)).length, feeds: 0 });
+    for (const c of rows) for (const d of c.deps) { const e = m.get(d); if (e) e.feeds++; }
+    return m;
+  }, [rows]);
 
   const selC = sel ? rows.find(c => c.id === sel) : null;
   const pan = (n: number) => setFrom(f => f + Math.round(span * n) * DAY);
@@ -141,34 +180,8 @@ export function Timeline({ rows, unscheduled, showDeps, chain, note }: {
             setFrom(startOfDay(extent.a - 4 * DAY));
           }}>Fit all dates</button>
         )}
-        <label className="tl-toggle">
-          <input type="checkbox" checked={arrows} onChange={e => setArrows(e.target.checked)} />
-          Show dependency links
-        </label>
+        <span className="tl-hint">Select a row to see what it waits on</span>
       </div>
-
-      {arrows && (
-        <p className="tl-note">
-          <Icon name="info" size={14} />
-          <span>
-            {edges.length === 0 && lateCount > 0 ? (
-              <>
-                <b>Not one of the {lateCount} prerequisites between these bars finishes before the work that needs it starts.</b> Every
-                link would run backwards across the chart, so they are flagged on the rows instead of drawn. On the dates as recorded,
-                no component here can begin when it is meant to.
-              </>
-            ) : (
-              <>
-                {edges.length} link{edges.length === 1 ? "" : "s"} drawn{sel ? " for the selected row" : ""}: a prerequisite that finishes
-                before the work needing it starts.
-                {lateCount > 0 && <> The other {lateCount} run backwards, because the prerequisite is not due until after that start.
-                  Those are flagged on the row rather than drawn, since the lines would cross everything.</>}
-                {!sel && " Select a row to see only its own links."}
-              </>
-            )}
-          </span>
-        </p>
-      )}
 
       {note}
 
@@ -192,14 +205,22 @@ export function Timeline({ rows, unscheduled, showDeps, chain, note }: {
               {todayPct >= 0 && todayPct <= 100 && <i className="tl-today" style={{ left: todayPct + "%" }} />}
             </div>
 
-            {edges.length > 0 && (
+            {rel.links.length > 0 && (
               <svg className="tl-arrows" width={w} height={visible.length * ROW} aria-hidden>
                 <defs>
                   <marker id="tlh" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
                     <path d="M0 1 L7 4 L0 7 z" fill="currentColor" />
                   </marker>
                 </defs>
-                {edges.map(e => <path key={e.key} className="tl-arrow" d={e.d} markerEnd="url(#tlh)" />)}
+                {rel.links.map(l => (
+                  <g key={l.key}>
+                    {l.span && (
+                      <rect className="tl-overlap" x={Math.min(l.span.x1, l.span.x2)} y={l.span.y - 9}
+                        width={Math.abs(l.span.x2 - l.span.x1)} height={18} rx="3" />
+                    )}
+                    {l.d && <path className="tl-arrow" d={l.d} markerEnd="url(#tlh)" />}
+                  </g>
+                ))}
               </svg>
             )}
 
@@ -211,8 +232,19 @@ export function Timeline({ rows, unscheduled, showDeps, chain, note }: {
               const l = Math.max(0, pct(dayOf(c.start)));
               const rt = Math.min(100, pct(dayOf(c.due)));
               const slip = c.eta && dayOf(c.eta) > dayOf(c.due) ? Math.min(100, pct(dayOf(c.eta))) : null;
-              return (
-                <button key={c.id} className={cx("tl-row", sel === c.id && "on", chain?.has(c.id) && "chain")} onClick={() => setSel(s => s === c.id ? null : c.id)} aria-label={`${c.name}, ${fmtDate(c.start)} to ${fmtDate(c.due)}`}>
+                const n = counts.get(c.id) ?? { needs: 0, feeds: 0 };
+                // A component can be on both sides of the selection at once. That is
+                // not a display quirk, it is one of the loops the Dependencies page
+                // counts, and it is worth saying so here rather than picking a side.
+                const role = rel.needs.has(c.id)
+                  ? (rel.feeds.has(c.id) ? "loop" : "needs")
+                  : rel.feeds.has(c.id) ? "feeds" : null;
+                const dim = !!sel && sel !== c.id && !role;
+                return (
+                <button key={c.id}
+                  className={cx("tl-row", sel === c.id && "on", role && "rel-" + role, dim && "dim", chain?.has(c.id) && "chain")}
+                  onClick={() => setSel(s => s === c.id ? null : c.id)}
+                  aria-label={`${c.name}, ${fmtDate(c.start)} to ${fmtDate(c.due)}, needs ${n.needs}, ${n.feeds} waiting on it`}>
                   <span className="tl-row-lbl">
                     <Avatar p={person(c.ownerId)} size={18} />
                     <b>{c.name}</b>
@@ -221,12 +253,15 @@ export function Timeline({ rows, unscheduled, showDeps, chain, note }: {
                         <Icon name="alert" size={12} />
                       </i>
                     )}
+                    {role && <em className={"tl-role " + role}>{role === "needs" ? "first" : role === "feeds" ? "after" : "loop"}</em>}
+                    <span className="tl-deps" title={`Needs ${n.needs} finished first. ${n.feeds} waiting on it.`}>
+                      {n.needs > 0 && <i className="d-needs">{n.needs}</i>}
+                      {n.feeds > 0 && <i className="d-feeds">{n.feeds}</i>}
+                    </span>
                   </span>
                   <span className="tl-row-track">
                     {slip !== null && <i className="tl-slip" style={{ left: rt + "%", width: Math.max(0.4, slip - rt) + "%" }} />}
-                    <i className={cx("tl-bar", "b-" + tone)} style={{ left: l + "%", width: Math.max(0.8, rt - l) + "%" }}>
-                      <em>{spanDays(c)}d</em>
-                    </i>
+                    <i className={cx("tl-bar", "b-" + tone)} style={{ left: l + "%", width: Math.max(0.8, rt - l) + "%" }} />
                   </span>
                 </button>
               );
@@ -239,6 +274,7 @@ export function Timeline({ rows, unscheduled, showDeps, chain, note }: {
             <span><i className="k b-blk" />Blocked</span>
             <span><i className="k b-done" />Completed</span>
             <span><i className="k k-slip" />ETA past the due date</span>
+            <span><i className="k k-late" />Prerequisite still running after the work needing it was due to start</span>
             {hidden > 0 && <span className="tl-hidden">{hidden} bar{hidden === 1 ? "" : "s"} fall outside this window. Widen it or press Fit all dates.</span>}
           </div>
         </div>

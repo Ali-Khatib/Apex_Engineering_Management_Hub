@@ -50,15 +50,24 @@ export function BlockerRow({ b, hideComponent }: { b: Blocker; hideComponent?: b
   const over = OPEN_BLOCKER(b) && d < 0;
   return (
     <>
-      <tr className="clickable" onClick={() => setOpen(true)}>
-        <td><div className="name-cell" style={{ minWidth: 240 }}><span className="row" style={{ gap: 6, flexWrap: "nowrap" }}><code className="cid">{b.id}</code><b style={{ fontWeight: 500 }}>{b.title}</b></span><small>{hideComponent ? b.category : <>{b.componentId} · {b.category}</>}</small></div></td>
-        {!hideComponent && <td onClick={e => e.stopPropagation()}><CompLink id={b.componentId} showId={false} /></td>}
-        {!hideComponent && <td><Pill tone={SEV_TONE[b.severity]}>{b.severity}</Pill></td>}
-        <td><PersonChip id={b.responsibleId} /></td>
-        <td style={{ maxWidth: 280, fontSize: 13, color: "var(--fg-2)" }}>{b.nextAction}</td>
-        <td><span className={cx("due", over && "due-over")}>{fmtDate(b.target)}<small>{OPEN_BLOCKER(b) ? relDays(b.target) : "—"}</small></span></td>
-        <td>{blockerStatus(b.status)}</td>
-      </tr>
+      <button className={cx("blki", "sev-" + b.severity)} onClick={() => setOpen(true)}>
+        <div className="blki-top">
+          <code className="cid">{b.id}</code>
+          <b>{b.title}</b>
+          <Pill tone={SEV_TONE[b.severity]}>{b.severity}</Pill>
+          {blockerStatus(b.status)}
+        </div>
+        <div className="blki-where">
+          {!hideComponent && <><CompLink id={b.componentId} showId={false} /><span aria-hidden>·</span></>}
+          <span>{b.category}</span>
+        </div>
+        <div className="blki-next">
+          <span className="blki-lbl">Next</span>
+          <span className="blki-act">{b.nextAction}</span>
+          <PersonChip id={b.responsibleId} size={18} />
+          <span className={cx("blki-due", over && "is-over")}>{fmtDate(b.target)}{OPEN_BLOCKER(b) && <em>{relDays(b.target)}</em>}</span>
+        </div>
+      </button>
       {open && <BlockerDrawer b={b} onClose={() => setOpen(false)} />}
     </>
   );
@@ -184,8 +193,7 @@ export function Blockers() {
               )}
             </div>
           ) : (
-            <div className="table-wrap"><table className="tbl"><thead><tr><th>Blocker</th><th>Component</th><th>Severity</th><th>Responsible</th><th>Next action</th><th>Target</th><th>Status</th></tr></thead>
-              <tbody>{list.map(b => <BlockerRow key={b.id} b={b} />)}</tbody></table></div>
+            <div className="blklist">{list.map(b => <BlockerRow key={b.id} b={b} />)}</div>
           )}
         </section>
         <div className="stack-v">

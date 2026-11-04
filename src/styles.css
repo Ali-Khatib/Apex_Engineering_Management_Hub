@@ -1207,7 +1207,6 @@ body::before { background: var(--bg); }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .filters select { width: auto; max-width: 240px; }
 input[type=text], input[type=email], input[type=date], input[type=url], input[type=search], select, textarea { background-color: rgba(255,255,255,.03); border-color: var(--line-strong); color: var(--fg); border-radius: 10px; }
-select option { background: #0E1D16; color: var(--fg); }
 .count-line { font-size: 13px; color: var(--fg-3); margin-top: -12px; }
 .table-card { padding: 6px 0; }
 .lgroup { --c: #888; }
@@ -1488,7 +1487,6 @@ code, .mono { font-family: var(--font-mono); font-size: .88em; }
 input[type=text], input[type=email], input[type=date], input[type=url], input[type=search], select, textarea {
   background: var(--surface); border: 1px solid var(--line-strong); color: var(--fg); border-radius: var(--r);
   font-family: var(--font-ui); font-size: 13.5px; }
-select option { background: #fff; color: var(--fg); }
 :focus-visible { outline: none; box-shadow: var(--focus); }
 
 /* ── tables and rows: rules and alignment, no zebra, no header band ─────── */
@@ -2179,3 +2177,57 @@ button.li3:hover, button.li:hover { background: var(--surface-2); }
 .axis-note > svg { flex: none; margin-top: 1px; color: var(--warn); }
 .axis-note b { color: var(--fg); font-weight: 600; }
 .axis-note button { border: 0; background: none; padding: 0; color: var(--brand-ink); font-size: 13px; font-weight: 500; text-decoration: underline; }
+
+/* ════════════════════════════════════════════════════════════════════
+   NO HORIZONTAL SCROLLING
+   Nothing in this application scrolls sideways. Wide data reflows, tabs
+   wrap, and anything that genuinely cannot shrink is scaled to fit.
+   ════════════════════════════════════════════════════════════════════ */
+.tabs, .secnav, .segs { overflow-x: visible; flex-wrap: wrap; }
+.board { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); overflow-x: visible; }
+.arch-files { overflow-x: visible !important; }
+.gantt, .arch-scroll { overflow-x: visible; }
+.arch-scroll svg, .gantt svg { max-width: 100%; height: auto; }
+
+/* Remaining tables stack into labelled rows instead of scrolling.
+   Each cell carries its column name in data-label. */
+.table-wrap { overflow-x: visible; }
+@media (max-width: 900px) {
+  .tbl thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .tbl, .tbl tbody, .tbl tr, .tbl td { display: block; width: auto; }
+  .tbl tr { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .tbl td { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; border: 0; }
+  .tbl td::before { content: attr(data-label); flex: none; width: 108px; font-size: 11.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--fg-4); }
+  .tbl td:empty { display: none; }
+}
+
+/* ───────── Blockers as rows, not a seven-column table ─────────
+   A blocker answers three things: what is stuck, where, and who does what
+   next. Three lines, each one of those, and it reflows at any width. */
+.blklist { display: grid; }
+.blki {
+  display: grid; gap: 6px; width: 100%; text-align: left;
+  padding: 13px 16px 14px; border: 0; border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong); background: none;
+  transition: background-color var(--t-ui) var(--ease);
+}
+.blki:last-child { border-bottom: 0; }
+.blki:hover { background: var(--surface-2); }
+.blki.sev-critical { border-left-color: var(--crit); }
+.blki.sev-high { border-left-color: var(--warn); }
+.blki.sev-medium { border-left-color: var(--info); }
+.blki.sev-low { border-left-color: var(--line-strong); }
+.blki-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.blki-top b { font-size: 14px; font-weight: 500; color: var(--fg); }
+.blki-where { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12.5px; color: var(--fg-3); }
+.blki-next { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 7px; border-top: 1px dashed var(--line); font-size: 13px; color: var(--fg-2); }
+.blki-lbl { flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--fg-4); }
+.blki-act { flex: 1 1 260px; min-width: 0; }
+.blki-due { flex: none; font-size: 12.5px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.blki-due em { font-style: normal; margin-left: 6px; color: var(--fg-4); }
+.blki-due.is-over { color: var(--crit); font-weight: 500; }
+.blki-due.is-over em { color: var(--crit); }
+
+/* Last line of defence: nothing may push the page sideways. */
+html, body { max-width: 100%; overflow-x: hidden; }
+.page, .shell-main { min-width: 0; max-width: 100%; }

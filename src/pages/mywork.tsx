@@ -218,7 +218,7 @@ export function MyWork() {
 
       {myBlockers.length > 0 && (
         <Section title="Blockers you are responsible for" sub="Other people are waiting on these">
-          <div className="table-wrap"><table className="tbl"><thead><tr><th>Blocker</th><th>Component</th><th>Severity</th><th>Responsible</th><th>Next action</th><th>Target</th><th>Status</th></tr></thead><tbody>{myBlockers.map(b => <BlockerRow key={b.id} b={b} />)}</tbody></table></div>
+          <div className="blklist">{myBlockers.map(b => <BlockerRow key={b.id} b={b} />)}</div>
         </Section>
       )}
 

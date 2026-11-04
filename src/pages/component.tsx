@@ -653,7 +653,7 @@ function BlockersTab({ c, onAdd, onAssign }: { c: Component; onAdd: () => void; 
     <div className="split">
       <div className="stack-v">
         <Section title="Blockers" sub="Structured records: what's blocking, who unblocks it, the next action and when." actions={<Button size="sm" variant="primary" icon="plus" onClick={onAdd}>Add blocker</Button>}>
-          {open.length === 0 ? <Empty icon="check" title="No open blockers" /> : <div className="table-wrap"><table className="tbl"><thead><tr><th>Blocker</th><th>Responsible</th><th>Next action</th><th>Target</th><th>Status</th></tr></thead><tbody>{open.map(b => <BlockerRow key={b.id} b={b} hideComponent />)}</tbody></table></div>}
+          {open.length === 0 ? <Empty icon="check" title="No open blockers" /> : <div className="blklist">{open.map(b => <BlockerRow key={b.id} b={b} hideComponent />)}</div>}
           {done.length > 0 && <div className="panel-body muted" style={{ fontSize: 13 }}>{done.length} resolved: {done.map(b => b.title).join(" · ")}</div>}
         </Section>
         <Section title="Handoffs" actions={isAdmin && <Button size="sm" icon="handoff" onClick={onAssign}>Reassign owner</Button>}>

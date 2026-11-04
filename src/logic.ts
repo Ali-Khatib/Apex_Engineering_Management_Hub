@@ -178,3 +178,49 @@ export function ownershipCounts(cs: Component[], meId?: string | null) {
   for (const c of cs) n[ownership(c, meId)]++;
   return n;
 }
+
+/**
+ * The one thing that has to happen next, and who has to do it.
+ * Derived entirely from the record: blockers, gates, review state, dependencies.
+ * Nothing here is guessed. If the record does not say, this says so.
+ */
+export interface NextAction { text: string; who: string | null; urgent: boolean; }
+export function nextAction(s: AppState, c: Component): NextAction {
+  if (isDone(c)) return { text: "Delivered", who: null, urgent: false };
+
+  const ob = openBlockers(s, c.id);
+  if (ob.length) {
+    const b = ob.sort((x, y) => (x.severity === "critical" ? -1 : 0) - (y.severity === "critical" ? -1 : 0))[0];
+    return { text: b.nextAction || `Resolve blocker ${b.id}`, who: b.responsibleId, urgent: true };
+  }
+  if (!c.ownerId) return { text: "Needs an owner before work can start", who: null, urgent: true };
+  if (c.review === "changes_requested") return { text: "Rework what the reviewer sent back", who: c.ownerId, urgent: true };
+  if (c.gates.qa.state === "changes_requested" || c.gates.qa.state === "rejected") return { text: "Rework what QA sent back", who: c.ownerId, urgent: true };
+  if (c.gates.checks.state === "failed") return { text: "Fix the failing checks", who: c.ownerId, urgent: true };
+
+  if (c.gates.deploy.state === "ready" || c.gates.deploy.state === "scheduled") return { text: "Deployment approved, waiting to ship", who: null, urgent: false };
+  if (c.gates.qa.state === "accepted") return { text: "Waiting on a deployment decision", who: null, urgent: false };
+  if (c.gates.qa.state === "awaiting" || c.gates.qa.state === "in_progress") return { text: "Waiting on QA", who: c.qaId, urgent: false };
+  if (c.review === "in_review") return { text: "Waiting on code review", who: c.reviewerId, urgent: false };
+
+  const waiting = c.deps.map(id => s.components.find(x => x.id === id)).filter(d => d && !isDone(d)) as Component[];
+  if (waiting.length && c.status === "not_started") return { text: `Waiting on ${waiting.slice(0, 3).map(d => d.id).join(", ")}${waiting.length > 3 ? ` +${waiting.length - 3}` : ""}`, who: null, urgent: false };
+
+  if (c.status === "not_started") return { text: "Not started", who: c.ownerId, urgent: false };
+
+  const open = c.criteria.filter(k => k.status !== "accepted" && k.status !== "submitted").length;
+  if (open) return { text: `Submit evidence (${open} ${open > 1 ? "criteria" : "criterion"})`, who: c.ownerId, urgent: false };
+  if (c.criteria.some(k => k.status === "submitted")) return { text: "Evidence submitted, waiting on review", who: c.reviewerId, urgent: false };
+  return { text: "Submit for review", who: c.ownerId, urgent: false };
+}
+
+/** Most urgent first: blocked, then overdue, then priority, then nearest due date. */
+export function byUrgency(s: AppState) {
+  return (a: Component, b: Component) => {
+    const ra = risk(s, a).level, rb = risk(s, b).level;
+    const rank = (r: string) => (r === "blocked" ? 0 : r === "at_risk" ? 1 : 2);
+    return rank(ra) - rank(rb)
+      || PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+      || (a.due || "9999").localeCompare(b.due || "9999");
+  };
+}

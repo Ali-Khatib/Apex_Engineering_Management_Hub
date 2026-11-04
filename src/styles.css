@@ -1851,3 +1851,90 @@ button.li3:hover, button.li:hover { background: var(--surface-2); }
 @media (max-width: 560px) { .ownstrip-row { grid-template-columns: minmax(0, 1fr); } .ownbox { border-left: 0; } .ownbox + .ownbox { border-top: 1px solid var(--line); } }
 .ost-completed .avatar { filter: saturate(.5); }
 .ownstrip-head h2 span { font-weight: 400; color: var(--fg-4); }
+
+/* ───────── My work ─────────
+   One list, not a hero card plus leftovers. The primary carries a marker and a
+   left rule; it does not get its own stage. Each row opens in place for the
+   working detail, so nothing from the old card view is lost. */
+.wstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; margin: 0 0 16px; }
+.wstat { display: grid; gap: 2px; padding: 13px 16px 14px; border-left: 1px solid var(--line); }
+.wstat:first-child { border-left: 0; }
+.wstat strong { font-size: 24px; font-weight: 500; line-height: 1.1; letter-spacing: -.02em; color: var(--fg); font-variant-numeric: tabular-nums; }
+.wstat span { font-size: 12.5px; color: var(--fg-3); }
+.wstat.t-crit strong { color: var(--crit); }
+.wstat.t-ok strong { color: var(--ok); }
+
+.wlist { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
+.wlist-head,
+.wrow-main { display: grid; grid-template-columns: 30px 56px minmax(0, 1.25fr) 86px 108px 92px minmax(0, 1.7fr); gap: 12px; align-items: center; }
+.wlist-head { padding: 9px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-4); }
+
+.wrow { border-bottom: 1px solid var(--line); }
+.wrow:last-child { border-bottom: 0; }
+.wrow-main { padding: 11px 18px; border-left: 3px solid transparent; transition: background-color var(--t-ui) var(--ease); }
+.wrow:hover .wrow-main { background: var(--surface-2); }
+.wrow.is-primary .wrow-main { border-left-color: var(--brand); }
+.wrow.is-blocked .wrow-main { border-left-color: var(--crit); }
+.wrow.is-open .wrow-main { background: var(--surface-2); }
+
+.wrow-toggle { width: 24px; height: 24px; display: grid; place-items: center; border: 0; background: none; border-radius: var(--r-sm); color: var(--fg-4); }
+.wrow-toggle:hover { color: var(--fg); background: var(--surface-3); }
+.wrow-toggle svg { transition: transform 160ms var(--ease); }
+.wrow.is-open .wrow-toggle svg { transform: rotate(90deg); }
+
+.wrow-name { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--fg); }
+.wrow-name b { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrow-name:hover b { color: var(--brand-ink); }
+.wrow-name em {
+  font-style: normal; flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  padding: 1px 6px; border-radius: var(--r-pill); background: var(--brand-wash); color: var(--brand-ink);
+}
+.wrow-next { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 13px; color: var(--fg-2); }
+.wrow-next > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrow-next small { flex: none; color: var(--fg-4); font-size: 12px; }
+.wrow-next.urgent { color: var(--crit); font-weight: 500; }
+.wrow-bang { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--crit); }
+
+.wrow-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px 26px; padding: 4px 18px 20px 51px; background: var(--surface-2); border-top: 1px solid var(--line); }
+.wdet-wide { grid-column: 1 / -1; }
+.wdet h5 { margin: 0 0 7px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-4); }
+.wdet p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--fg-2); }
+.wdet-accept { margin-top: 8px !important; font-size: 12.5px !important; color: var(--fg-3) !important; }
+.wdl { margin: 0; display: grid; gap: 6px; }
+.wdl > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 13px; }
+.wdl dt { color: var(--fg-4); }
+.wdl dd { margin: 0; color: var(--fg-2); min-width: 0; }
+.wdeps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.wdeps li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+.wblk { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.wblk li { display: grid; gap: 2px; font-size: 13px; padding-left: 11px; border-left: 2px solid var(--crit); }
+.wblk b { color: var(--fg); font-weight: 500; }
+.wblk span { color: var(--fg-3); font-size: 12.5px; }
+
+.wdone { margin-top: 14px; }
+.wdone-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 0; background: none; border-radius: var(--r-sm); color: var(--fg-3); font-size: 13px; }
+.wdone-head:hover { background: var(--surface-2); color: var(--fg); }
+.wdone-head b { font-weight: 500; }
+.wdone-head span { font-variant-numeric: tabular-nums; color: var(--fg-4); }
+.wdone-head svg { transition: transform 160ms var(--ease); }
+.wdone-head[aria-expanded="true"] svg { transform: rotate(90deg); }
+.wdone-list { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; margin-top: 4px; }
+.wdone-row { display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--line); color: var(--fg-2); }
+.wdone-row:last-child { border-bottom: 0; }
+.wdone-row:hover { background: var(--surface-2); }
+.wdone-row b { font-weight: 500; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1180px) {
+  .wlist-head, .wrow-main { grid-template-columns: 30px 60px minmax(0, 1.4fr) 112px 104px minmax(0, 1.2fr); }
+  .wlist-head > :nth-child(4), .wrow-pri { display: none; }
+}
+@media (max-width: 880px) {
+  .wstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wstat:nth-child(3) { border-left: 0; }
+  .wstat:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .wlist-head { display: none; }
+  .wrow-main { grid-template-columns: 30px minmax(0, 1fr) auto; row-gap: 6px; }
+  .wrow-id, .wrow-status { display: none; }
+  .wrow-next { grid-column: 2 / -1; }
+  .wrow-detail { padding-left: 18px; }
+}

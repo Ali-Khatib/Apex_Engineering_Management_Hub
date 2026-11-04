@@ -322,7 +322,9 @@ export function situation(s: AppState, c: Component): string {
   const needs = pending.length === 0 ? "" : pending.length === 1
     ? ` It also needs ${pending[0].name} first.`
     : ` It also needs ${pending.length} other components first.`;
-  const reuse = c.lib?.sps.length ? ` Meant to extend ${c.lib.sps.slice(0, 2).join(" and ")}.` : " No platform module is mapped to it, so it would be built from scratch.";
+  // The source sheet says "Not yet mapped in Platform Bridge" for these, which
+  // is not the same as saying it must be built from scratch. Report the record.
+  const reuse = c.lib?.sps.length ? ` Meant to extend ${c.lib.sps.slice(0, 2).join(" and ")}.` : " No platform module is mapped to it yet.";
 
   const w = c.lib?.wave || "";
   if (DECISION_WAVES.includes(w)) return `Nobody can be put on it until architecture review agrees the approach.${holdsUp}${reuse}`;

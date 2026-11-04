@@ -71,8 +71,9 @@ export function Graph() {
       <header className="ph">
         <h1>Dependencies</h1>
         <p className="lede">
-          {edgeCount} recorded prerequisites across {cs.length} components. {model.loops.length} groups need each other in a loop,
-          so those cannot be sequenced at all until somebody decides how to break them. Nothing on this page changes a dependency on its own.
+          {edgeCount} recorded prerequisites across {cs.length} components. They form {model.sccs.length} tangles
+          {model.sccs.length > 0 && <> of {model.sccs.map(s => s.length).join(", ")} components</>}, holding {model.loops.length} separate
+          loops to decide. Nothing on this page changes a dependency on its own.
         </p>
       </header>
 
@@ -84,7 +85,7 @@ export function Graph() {
         render={v =>
           v === "list" ? <DepList model={model} onFocus={id => { setFocus(id); setView("graph"); }} />
             : v === "graph" ? <GraphView model={model} focus={focus} setFocus={setFocus} />
-              : v === "plan" ? <PlanView loops={model.loops.length} />
+              : v === "plan" ? <PlanView model={model} />
                 : <DecisionsView model={model} decided={decided} />} />
     </>
   );
@@ -234,8 +235,9 @@ function GraphView({ model, focus, setFocus }: { model: ReturnType<typeof analys
 
 /* ───────────────────────── Plan ───────────────────────── */
 
-function PlanView({ loops }: { loops: number }) {
+function PlanView({ model }: { model: ReturnType<typeof analyse> }) {
   const { state } = useStore();
+  const loops = model.loops.length;
   const cs = state.components;
   const sch = useMemo(() => cs.filter(isScheduled).sort((a, b) => dayOf(a.start) - dayOf(b.start)), [cs]);
   const un = useMemo(() => cs.filter(c => !isScheduled(c)), [cs]);
@@ -286,6 +288,17 @@ function PlanView({ loops }: { loops: number }) {
           Step 1 is everything with no outstanding prerequisite. Each step after it is everything whose prerequisites are all in an
           earlier step. This is arithmetic on the dependency records, not a decision anyone has taken.
         </p>
+        {steps.length === 0 && (
+          <div className="pl-stuck">
+            <h4><Icon name="alert" size={14} />There is no step 1</h4>
+            <p>
+              Every one of the {state.components.length} components names at least one prerequisite, and none of those prerequisites is
+              complete, so no component qualifies for the first step and the order never starts. This is not a gap in the data: the records
+              describe a library in which nothing can be built first. It resolves when the {model.sccs.length} tangles are decided under{" "}
+              <b>Decisions</b>, or when a component is recorded as having no prerequisite.
+            </p>
+          </div>
+        )}
         <div className="pl-steps">
           {steps.map((step, i) => (
             <div key={i} className="pl-step">
@@ -299,7 +312,7 @@ function PlanView({ loops }: { loops: number }) {
             </div>
           ))}
         </div>
-        {stuck.length > 0 && (
+        {stuck.length > 0 && steps.length > 0 && (
           <div className="pl-stuck">
             <h4><Icon name="alert" size={14} />{stuck.length} components have no step</h4>
             <p>
@@ -317,7 +330,7 @@ function PlanView({ loops }: { loops: number }) {
 /* ───────────────────────── Decisions ───────────────────────── */
 
 function DecisionsView({ model, decided }: { model: ReturnType<typeof analyse>; decided: number }) {
-  const { component } = useStore();
+  const { state, component } = useStore();
   const [shown, setShown] = useState(8);
   const first = model.loops[0];
   const a = first && component(first.ids[0]);
@@ -335,6 +348,28 @@ function DecisionsView({ model, decided }: { model: ReturnType<typeof analyse>; 
           </p>
         </div>
       )}
+
+      <section className="dr-scc">
+        <h3>{model.sccs.length} tangles, {model.loops.length} decisions</h3>
+        <p>
+          A tangle is a set of components that can all reach each other through their prerequisites, so none of them can be sequenced
+          against the rest. Inside a tangle there are many separate loops, and each loop is one decision somebody can take. Breaking
+          enough loops in a tangle is what releases the components in it.
+        </p>
+        <div className="dr-scc-l">
+          {model.sccs.map((s, i) => {
+            const mine = model.loops.filter(l => l.ids.every(id => model.sccOf.get(id) === i));
+            const done = mine.filter(l => ["decided", "deferred"].includes(state.cycleDecisions?.[l.key]?.status || "")).length;
+            return (
+              <div key={i} className={cx("dr-scc-i", i === 0 && "lead")}>
+                <b>{s.length} components</b>
+                <span>{mine.length} loop{mine.length === 1 ? "" : "s"} inside</span>
+                <small>{done} of {mine.length} decided</small>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <div className="dr-head">
         <h2>Decisions needed</h2>

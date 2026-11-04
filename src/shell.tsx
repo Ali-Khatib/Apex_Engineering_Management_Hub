@@ -146,7 +146,8 @@ export const NAV = [
     { id: "map", label: "Build order", sub: "What has to be finished first", icon: "graph" },
   ] },
   { group: "Reference", items: [
-    { id: "modules", label: "Platform modules", sub: "SP-01 to SP-20 — already built, reuse these", icon: "layers" },
+    { id: "knowledge", label: "Engineering knowledge", sub: "How Apex builds, and where it is written down", icon: "about" },
+    { id: "modules", label: "Platform modules", sub: "SP-01 to SP-20, already built and reusable", icon: "layers" },
     { id: "repos", label: "Repositories", sub: "Where each component's code lives", icon: "repo" },
     { id: "practices", label: "Best practices", sub: "How we agreed to build", icon: "practices" },
     { id: "team", label: "Team", sub: "People and what they own", icon: "team" },

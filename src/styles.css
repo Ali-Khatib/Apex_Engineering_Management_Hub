@@ -2303,3 +2303,47 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .cyc-dl dt { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-4); }
 .cyc-dl dd { margin: 0; font-size: 13px; color: var(--fg-2); }
 .cyc-dl em { font-style: normal; color: var(--fg-4); }
+
+/* ───────── Documentation gaps (module pages) ───────── */
+.docf { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.docf li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; }
+.docf li svg { flex: none; margin-top: 2px; color: var(--ok); }
+.docf li.no svg { color: var(--warn); }
+.docf li span { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.docf b { font-weight: 500; color: var(--fg); }
+.docf small { font-size: 12.5px; color: var(--fg-3); }
+.docf em { flex: none; font-style: normal; font-size: 11px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--warn-bg); color: var(--warn); white-space: nowrap; }
+.docd { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.docd h5 { margin: 0 0 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-4); }
+.docd > p { margin: 0 0 12px; font-size: 12.5px; line-height: 1.55; color: var(--fg-3); max-width: 84ch; }
+
+/* ───────── Knowledge Center ───────── */
+.kn-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 18px; font-size: 12.5px; color: var(--fg-3); }
+.kn-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.kn-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.kn-legend i.s-live { background: var(--ok); }
+.kn-legend i.s-partial { background: var(--warn); }
+.kn-legend i.s-missing { background: var(--fg-4); }
+.kn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; }
+.kn-area { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
+.kn-area > header { display: flex; gap: 11px; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.kn-ic { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: var(--r); background: var(--brand-wash); color: var(--brand-ink); }
+.kn-area h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--fg); }
+.kn-area > header p { margin: 1px 0 0; font-size: 12.5px; color: var(--fg-3); }
+.kn-area ul { list-style: none; margin: 0; padding: 6px 0; }
+.kn-area li { display: flex; align-items: flex-start; gap: 11px; padding: 9px 18px; }
+.kn-area li.is-link { cursor: pointer; }
+.kn-area li.is-link:hover { background: var(--surface-2); }
+.kn-area li > i { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+.kn-area li.s-live > i { background: var(--ok); }
+.kn-area li.s-partial > i { background: var(--warn); }
+.kn-area li.s-missing > i { background: var(--fg-4); }
+.kn-area li span { display: grid; gap: 2px; min-width: 0; }
+.kn-area li b { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 500; color: var(--fg); }
+.kn-area li.s-missing b { color: var(--fg-3); }
+.kn-area li b svg { color: var(--fg-4); }
+.kn-area li.is-link:hover b svg { color: var(--brand-ink); }
+.kn-area li small { font-size: 12.5px; line-height: 1.5; color: var(--fg-3); }
+.kn-foot { display: flex; align-items: flex-start; gap: 9px; margin: 20px 0 0; padding: 13px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2); font-size: 13px; line-height: 1.6; color: var(--fg-3); }
+.kn-foot svg { flex: none; margin-top: 2px; color: var(--warn); }
+.kn-foot span { max-width: 96ch; }

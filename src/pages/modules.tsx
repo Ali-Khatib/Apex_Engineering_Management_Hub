@@ -1,7 +1,8 @@
 import React from "react";
 import { useStore, useNav } from "../store";
+import type { Component } from "../types";
 import { Icon } from "../icons";
-import { Empty, PersonChip, StatusPill } from "../ui";
+import { Empty, PersonChip, StatusPill, cx } from "../ui";
 import { LAYERS, LAYER_ORDER, WAVES } from "../seed";
 import { LayerOfTag, WaveTag, BarChart } from "./lib";
 
@@ -59,6 +60,8 @@ export function ModulePage({ id }: { id: string }) {
         <div><b>{cs.filter(c => c.ownerId).length}</b><small>with an owner</small></div>
         <div><b>{rows.length}</b><small>platform layers</small></div>
       </div>
+      <ModuleDocs m={m} cs={cs} />
+
       {cs.length === 0 ? <Empty icon="components" title="No components map to this module yet" /> : (
         <div className="two two-wide">
           <section className="card">
@@ -88,5 +91,67 @@ export function ModulePage({ id }: { id: string }) {
         </div>
       )}
     </>
+  );
+}
+
+
+/**
+ * §11 asks a module to document its responsibilities, capabilities, inputs,
+ * outputs, interfaces, dependencies, repository, owner and integration steps.
+ * The module record holds an id, a name, a one-line description and a folder
+ * link, and nothing else. Rather than invent the rest, this states exactly
+ * which fields exist and which still need writing, and shows what can be
+ * derived honestly from the components that build on the module.
+ */
+function ModuleDocs({ m, cs }: { m: { id: string; name: string; description: string; url: string }; cs: Component[] }) {
+  // Derived, not declared: the field names components exchange when they build
+  // on this module. Useful as evidence, not a substitute for a real contract.
+  const inputs = [...new Set(cs.flatMap(c => c.lib?.inputs || []))].slice(0, 12);
+  const outputs = [...new Set(cs.flatMap(c => c.lib?.outputs || []))].slice(0, 12);
+
+  const FIELDS: { label: string; have: boolean; note: string }[] = [
+    { label: "Purpose", have: !!m.description, note: m.description ? "One line, from the module register." : "Not written." },
+    { label: "Module folder", have: !!m.url, note: m.url ? "Linked." : "No link recorded." },
+    { label: "Responsibilities", have: false, note: "What this module is and is not accountable for." },
+    { label: "Capabilities", have: false, note: "What a consumer can actually ask it to do." },
+    { label: "Interfaces and APIs", have: false, note: "Endpoints, message shapes, versioning policy." },
+    { label: "Declared inputs and outputs", have: false, note: "The module's own contract, as opposed to what consumers happen to pass." },
+    { label: "Module dependencies", have: false, note: "Which other SP modules this one needs." },
+    { label: "Repository", have: false, note: "No repository is linked to a module record." },
+    { label: "Integration instructions", have: false, note: "How to adopt it in a new component." },
+    { label: "Owner", have: false, note: "No owner field exists on a module record." },
+  ];
+  const missing = FIELDS.filter(f => !f.have).length;
+
+  return (
+    <section className="spec" style={{ margin: "0 0 18px" }}>
+      <header className="spec-head">
+        <h2>Documentation</h2>
+        <span>{missing} of {FIELDS.length} fields still need writing. Nothing here is generated.</span>
+      </header>
+      <div className="spec-body">
+        <ul className="docf">
+          {FIELDS.map(f => (
+            <li key={f.label} className={cx(!f.have && "no")}>
+              <Icon name={f.have ? "check" : "alert"} size={13} />
+              <span><b>{f.label}</b><small>{f.note}</small></span>
+              {!f.have && <em>Needs documentation</em>}
+            </li>
+          ))}
+        </ul>
+
+        {(inputs.length > 0 || outputs.length > 0) && (
+          <div className="docd">
+            <h5>Observed in consuming components</h5>
+            <p>Field names that components building on {m.id} declare. Derived from those components, not from this module. Treat as evidence towards a contract, not the contract itself.</p>
+            <div className="contract-io" style={{ border: "1px solid var(--line)", borderRadius: "var(--r)" }}>
+              <div className="io"><h5>Inputs they pass</h5><ul className="io-list">{inputs.map(x => <li key={x}><code>{x}</code></li>)}</ul></div>
+              <div className="io-arrow" aria-hidden><Icon name="arrowRight" size={16} /></div>
+              <div className="io"><h5>Outputs they expect</h5><ul className="io-list">{outputs.map(x => <li key={x}><code>{x}</code></li>)}</ul></div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

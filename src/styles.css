@@ -1056,9 +1056,9 @@ a.sched-row:hover { text-decoration: none; background: var(--surface-2); }
   .pb p { font-size: 19px; }
 }
 
-/* ── shell geometry (structure only; colour comes from the layer below) ── */
-   v4 — deep-green workspace (one deliberate dark look), Attio-style
-   labelled sidebar, rounded panels, clear colour per layer & status.
+/* ── shell geometry ──
+   Structure only; colour comes from the theme layer below. Attio-style
+   labelled sidebar, rounded panels, one clear colour per layer & status.
    ════════════════════════════════════════════════════════════════════ */
 body { background: var(--bg); background-attachment: fixed; color: var(--fg); }
 body::before { background: var(--bg); }

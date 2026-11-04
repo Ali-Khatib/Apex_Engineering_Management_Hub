@@ -133,9 +133,11 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
         <NextActionBar c={c} />
         <BlockerAlarm c={c} onAdd={onBlocker} />
 
-        {/* Purpose and scope: short facts, not prose about facts. */}
+        {/* Purpose, contract and architecture describe the same component from
+            three angles, so they are one surface divided by rules, not three
+            bordered panels stacked on each other. */}
         <section className="spec">
-          <header className="spec-head"><h2>Purpose &amp; scope</h2><span>Why this exists and when to build it</span></header>
+          <header className="spec-head"><h2>What this is</h2><span>Its purpose, what it does, and where it sits</span></header>
           <div className="spec-body">
             <p className="spec-lede">{c.purpose || c.summary}</p>
             <dl className="facts">
@@ -145,18 +147,18 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
               {lib?.mapping && <Fact label="Reuse before building" wide>{lib.mapping}</Fact>}
             </dl>
           </div>
-        </section>
 
-        {lib && (
-          <section className="spec">
-            <header className="spec-head"><h2>What it does</h2><span>The operation contract recorded for this component</span></header>
-            <div className="spec-body"><Contract c={c} /></div>
-          </section>
-        )}
+          {lib && (
+            <div className="spec-part">
+              <h3 className="spec-sub">What it does</h3>
+              <Contract c={c} />
+            </div>
+          )}
 
-        <section className="spec">
-          <header className="spec-head"><h2>Architecture</h2><span>Relationships recorded on this component. Select a node to open it.</span></header>
-          <div className="spec-body"><ArchitectureMap c={c} /></div>
+          <div className="spec-part">
+            <h3 className="spec-sub">Where it sits <span>select a node to open it</span></h3>
+            <ArchitectureMap c={c} />
+          </div>
         </section>
 
         <section className="spec">

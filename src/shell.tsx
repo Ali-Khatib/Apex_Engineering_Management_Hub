@@ -147,15 +147,14 @@ export const NAV = [
   ] },
   { group: "Reference", items: [
     { id: "knowledge", label: "Engineering knowledge", sub: "How Apex builds, and where it is written down", icon: "about" },
-    { id: "architecture", label: "Architecture", sub: "How the modules and components fit together", icon: "graph" },
-    { id: "modules", label: "Platform modules", sub: "SP-01 to SP-20, already built and reusable", icon: "layers" },
+    { id: "architecture", label: "Architecture & modules", sub: "SP-01 to SP-20 and how everything fits together", icon: "layers" },
     { id: "repos", label: "Repositories", sub: "Where each component's code lives", icon: "repo" },
     { id: "practices", label: "Best practices", sub: "How we agreed to build", icon: "practices" },
     { id: "team", label: "Team", sub: "People and what they own", icon: "team" },
     { id: "about", label: "About & contacts", sub: "What Apex does, and who to ask", icon: "about" },
   ] },
 ];
-export const routeBase = (r: string) => r.startsWith("c-") ? "library" : r.startsWith("m-") ? "modules" : r.startsWith("p-") ? "practices" : r === "" || r === "overview" ? "home" : r;
+export const routeBase = (r: string) => r.startsWith("c-") ? "library" : r.startsWith("m-") ? "architecture" : r.startsWith("p-") ? "practices" : r === "" || r === "overview" ? "home" : r;
 
 /** Pages reachable outside the sidebar, so the breadcrumb can still name them. */
 export const OFF_NAV: Record<string, string> = { settings: "Settings" };

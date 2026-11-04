@@ -38,7 +38,7 @@ function Route() {
   if (route.startsWith("m-")) return <ModulePage key={route} id={route.slice(2)} />;
   if (route.startsWith("p-")) return <PracticePage key={route} id={route.slice(2)} />;
   switch (route) {
-    case "modules": return <Modules />;
+    case "modules": case "architecture": return <Architecture />;
     case "library": case "components": return <Components />;
     case "roadmap": case "plan": return <Roadmap />;
     case "map": case "graph": return <Graph />;
@@ -48,7 +48,6 @@ function Route() {
     case "settings": return <Settings />;
     case "qa": return <QA />;
     case "knowledge": return <Knowledge />;
-    case "architecture": return <Architecture />;
     case "practices": return <Practices />;
     case "about": return <About />;
     case "team": return <Team />;

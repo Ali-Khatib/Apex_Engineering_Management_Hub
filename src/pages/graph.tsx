@@ -5,10 +5,9 @@ import { Empty, cx } from "../ui";
 import { WaveTag } from "./lib";
 import { CycleCard } from "./cycles";
 import { DepGraph } from "./depgraph";
-import { Timeline } from "./timeline";
 import { analyse } from "../depmath";
 import { ViewSwitch, ViewPane, useView, type ViewDef } from "../views";
-import { isDone, isScheduled, dayOf, fmtDate, longestChain, openBlockers, STATUS_LABEL, situation } from "../logic";
+import { isDone, openBlockers, STATUS_LABEL, situation } from "../logic";
 import type { Component } from "../types";
 
 /**
@@ -24,33 +23,12 @@ import type { Component } from "../types";
  * changes the component itself.
  */
 
-type DV = "list" | "graph" | "plan" | "decisions";
+type DV = "list" | "graph" | "decisions";
 const VIEWS: ViewDef<DV>[] = [
   { id: "list", label: "List", icon: "components", answers: "Every prerequisite written out: what needs what, and whether it is satisfied yet." },
   { id: "graph", label: "Graph", icon: "graph", answers: "One component at a time, with what must finish before it and what is waiting on it." },
-  { id: "plan", label: "Plan", icon: "calendar", answers: "The recorded dates, and the build order those dependencies imply. Not an approved schedule." },
   { id: "decisions", label: "Decisions", icon: "flag", answers: "The loops. Two components that each need the other cannot be sequenced, so a person has to choose." },
 ];
-
-/**
- * The order the dependency records imply: everything with nothing outstanding,
- * then everything whose prerequisites are all in an earlier step, and so on.
- * It stops when nothing new can be placed, which is what a loop does to a
- * build order. That remainder is the honest output, not a failure.
- */
-function proposedOrder(cs: Component[]) {
-  const ids = new Set(cs.map(c => c.id));
-  const left = new Map(cs.map(c => [c.id, c.deps.filter(d => ids.has(d))]));
-  const placed = new Set<string>();
-  const steps: Component[][] = [];
-  for (let guard = 0; guard < 60 && placed.size < cs.length; guard++) {
-    const step = cs.filter(c => !placed.has(c.id) && left.get(c.id)!.every(d => placed.has(d)));
-    if (!step.length) break;
-    step.forEach(c => placed.add(c.id));
-    steps.push(step);
-  }
-  return { steps, stuck: cs.filter(c => !placed.has(c.id)) };
-}
 
 export function Graph() {
   const { state, component } = useStore();
@@ -81,12 +59,11 @@ export function Graph() {
 
       <ViewPane
         view={view}
-        order={["list", "graph", "plan", "decisions"]}
+        order={["list", "graph", "decisions"]}
         render={v =>
           v === "list" ? <DepList model={model} onFocus={id => { setFocus(id); setView("graph"); }} />
             : v === "graph" ? <GraphView model={model} focus={focus} setFocus={setFocus} />
-              : v === "plan" ? <PlanView model={model} />
-                : <DecisionsView model={model} decided={decided} />} />
+              : <DecisionsView model={model} decided={decided} />} />
     </>
   );
 }
@@ -233,100 +210,6 @@ function GraphView({ model, focus, setFocus }: { model: ReturnType<typeof analys
   );
 }
 
-/* ───────────────────────── Plan ───────────────────────── */
-
-function PlanView({ model }: { model: ReturnType<typeof analyse> }) {
-  const { state } = useStore();
-  const loops = model.loops.length;
-  const cs = state.components;
-  const sch = useMemo(() => cs.filter(isScheduled).sort((a, b) => dayOf(a.start) - dayOf(b.start)), [cs]);
-  const un = useMemo(() => cs.filter(c => !isScheduled(c)), [cs]);
-  const chain = useMemo(() => longestChain(state), [state]);
-  const chainSet = useMemo(() => new Set(chain.map(c => c.id)), [chain]);
-  const { steps, stuck } = useMemo(() => proposedOrder(cs), [cs]);
-
-  return (
-    <>
-      <p className="pl-warn">
-        <Icon name="alert" size={14} />
-        <span>
-          <b>There is no approved schedule.</b> The platform holds no record of an agreed plan, so nothing below is one.
-          The timeline shows the dates recorded on each component. The build order underneath is derived from the dependency
-          records by this page, and is a proposal for review, not an engineering commitment.
-        </span>
-      </p>
-
-      <Timeline
-        rows={sch} unscheduled={un} showDeps chain={chainSet}
-        note={
-          <p className="tl-note">
-            <Icon name="info" size={14} />
-            <span>
-              {sch.length} of {cs.length} components carry both a start and a due date. The rest are named under the chart.
-              The lime edge marks the longest chain of dated prerequisites, set out below.
-            </span>
-          </p>
-        } />
-
-      <section className="pl-chain">
-        <h3>Longest chain that can be calculated</h3>
-        <p>
-          A critical path cannot be worked out for the library as a whole: most components carry no dates, and {loops} groups
-          depend on each other in a loop. This is the longest run of dated prerequisites that genuinely can be,
-          {" "}{chain.length} components end to end. It is highlighted on the timeline above.
-        </p>
-        <ol className="pl-chain-l">
-          {chain.map(c => (
-            <li key={c.id}><a href={"#c-" + c.id}><code className="cid">{c.id}</code>{c.name}</a><span>{fmtDate(c.start)} to {fmtDate(c.due)}</span></li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="pl-order">
-        <h3>Proposed build order</h3>
-        <p>
-          Step 1 is everything with no outstanding prerequisite. Each step after it is everything whose prerequisites are all in an
-          earlier step. This is arithmetic on the dependency records, not a decision anyone has taken.
-        </p>
-        {steps.length === 0 && (
-          <div className="pl-stuck">
-            <h4><Icon name="alert" size={14} />There is no step 1</h4>
-            <p>
-              Every one of the {state.components.length} components names at least one prerequisite, and none of those prerequisites is
-              complete, so no component qualifies for the first step and the order never starts. This is not a gap in the data: the records
-              describe a library in which nothing can be built first. It resolves when the {model.sccs.length} tangles are decided under{" "}
-              <b>Decisions</b>, or when a component is recorded as having no prerequisite.
-            </p>
-          </div>
-        )}
-        <div className="pl-steps">
-          {steps.map((step, i) => (
-            <div key={i} className="pl-step">
-              <h4>Step {i + 1}<b>{step.length}</b></h4>
-              <div className="pl-step-l">
-                {step.slice(0, 12).map(c => (
-                  <a key={c.id} href={"#c-" + c.id}><code className="cid">{c.id}</code>{c.name}<WaveTag wave={c.lib?.wave} /></a>
-                ))}
-                {step.length > 12 && <span className="pl-more">and {step.length - 12} more</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-        {stuck.length > 0 && steps.length > 0 && (
-          <div className="pl-stuck">
-            <h4><Icon name="alert" size={14} />{stuck.length} components have no step</h4>
-            <p>
-              The order stops here. These components are in a loop, directly or through another component, so no step can ever
-              contain them: each one is waiting for something that is waiting for it. They stay out of the build order until the
-              loops are decided under <b>Decisions</b>.
-            </p>
-          </div>
-        )}
-      </section>
-    </>
-  );
-}
-
 /* ───────────────────────── Decisions ───────────────────────── */
 
 function DecisionsView({ model, decided }: { model: ReturnType<typeof analyse>; decided: number }) {
@@ -370,6 +253,16 @@ function DecisionsView({ model, decided }: { model: ReturnType<typeof analyse>; 
           })}
         </div>
       </section>
+
+      <div className="pl-stuck" style={{ marginBottom: 20 }}>
+        <h4><Icon name="alert" size={14} />There is no build order to produce</h4>
+        <p>
+          Every one of the {state.components.length} components names at least one prerequisite that is not finished, so nothing
+          qualifies to be built first and a build order cannot start at all. It is not a gap in the data. It is what the
+          {" "}{model.loops.length} loops below do to a library: each one is a pair, or a ring, where every member is waiting for
+          something that is waiting for it. Deciding them is what releases a sequence.
+        </p>
+      </div>
 
       <div className="dr-head">
         <h2>Decisions needed</h2>

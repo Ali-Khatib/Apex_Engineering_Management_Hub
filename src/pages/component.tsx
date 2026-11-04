@@ -375,7 +375,8 @@ function AcceptanceTab({ c }: { c: Component }) {
   const repo = state.repos.find(r => r.id === c.repoId);
   const unmet = deployBlockers(state, c);
   const g = c.gates;
-  const isQA = can.qaOrAdmin(c);
+  const isQA = can.qaDecide(c);
+  const canDeploy = can.deployApprove();
   const isReviewer = isAdmin || c.reviewerId === me?.id;
   const acc = c.criteria.filter(k => k.status === "accepted").length;
 
@@ -409,9 +410,9 @@ function AcceptanceTab({ c }: { c: Component }) {
           {g.deploy.note && <p className="ev-note">{g.deploy.note}</p>}
           {g.deploy.state !== "deployed" && g.deploy.state !== "ready" && (unmet.length ? <><span className="meta">Still needed:</span><ul>{unmet.map(u => <li key={u}>{u}</li>)}</ul></> : <span className="meta" style={{ color: "var(--ok)" }}>All requirements met. Ready for approval.</span>)}
           {isAdmin ? <div className="row" style={{ gap: 6 }}>
-            {!["ready", "deployed", "scheduled"].includes(g.deploy.state) && <Button size="sm" variant="primary" icon="rocket" disabled={unmet.length > 0} onClick={() => setNote({ title: "Approve for deployment", sub: "Confirms configuration and environment have been reviewed.", cta: "Approve", run: n => { setDeploy(c.id, "ready", n || "Approved."); toast("Approved for deployment"); } })}>Approve</Button>}
-            {g.deploy.state === "ready" && <Button size="sm" variant="primary" icon="rocket" onClick={() => setNote({ title: "Record deployment", cta: "Mark deployed", run: n => { setDeploy(c.id, "deployed", n || "Deployed."); toast("Deployment recorded"); } })}>Mark deployed</Button>}
-            {g.deploy.state === "ready" && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Withdraw approval", cta: "Withdraw", required: true, run: n => setDeploy(c.id, "not_ready", n) })}>Withdraw</Button>}
+            {!["ready", "deployed", "scheduled"].includes(g.deploy.state) && canDeploy && <Button size="sm" variant="primary" icon="rocket" disabled={unmet.length > 0} onClick={() => setNote({ title: "Approve for deployment", sub: "Confirms configuration and environment have been reviewed.", cta: "Approve", run: n => { setDeploy(c.id, "ready", n || "Approved."); toast("Approved for deployment"); } })}>Approve</Button>}
+            {g.deploy.state === "ready" && canDeploy && <Button size="sm" variant="primary" icon="rocket" onClick={() => setNote({ title: "Record deployment", cta: "Mark deployed", run: n => { setDeploy(c.id, "deployed", n || "Deployed."); toast("Deployment recorded"); } })}>Mark deployed</Button>}
+            {g.deploy.state === "ready" && canDeploy && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Withdraw approval", cta: "Withdraw", required: true, run: n => setDeploy(c.id, "not_ready", n) })}>Withdraw</Button>}
             {g.deploy.state === "deployed" && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Record rollback", cta: "Rolled back", tone: "danger", required: true, run: n => setDeploy(c.id, "rolled_back", n) })}>Record rollback</Button>}
           </div> : <span className="meta"><Icon name="lock" size={12} /> Only admins approve deployments.</span>}
         </div>

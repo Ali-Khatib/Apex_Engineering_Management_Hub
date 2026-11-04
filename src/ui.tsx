@@ -336,6 +336,14 @@ export function useCan() {
     ownerOrAdmin: (c: Component) => isAdmin || c.ownerId === me?.id,
     reviewOrAdmin: (c: Component) => isAdmin || c.reviewerId === me?.id || c.qaId === me?.id,
     qaOrAdmin: (c: Component) => isAdmin || c.qaId === me?.id,
+    /**
+     * Granting QA acceptance belongs to the named QA contact, not to anyone
+     * holding admin. An admin can manage assignments and still not be able to
+     * sign off quality on a component they do not QA.
+     */
+    qaDecide: (c: Component) => !!me && c.qaId === me.id,
+    /** Deployment approval is its own authority, held by admins. */
+    deployApprove: () => isAdmin,
   };
 }
 

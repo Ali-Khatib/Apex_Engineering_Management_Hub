@@ -271,3 +271,7 @@ export function lifecycleCounts(s: AppState, cs: Component[]) {
   for (const c of cs) n[lifecycle(s, c)]++;
   return n;
 }
+
+export const CHECK_LABEL: Record<string, string> = {
+  passed: "passed", failed: "failing", running: "running", pending: "pending", skipped: "skipped", unknown: "not run",
+};

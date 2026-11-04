@@ -139,6 +139,7 @@ export const NAV = [
     { id: "mywork", label: "My work", sub: "The components assigned to you", icon: "mywork" },
     { id: "library", label: "Components", sub: "All 127, grouped by platform layer", icon: "components" },
     { id: "blockers", label: "Blockers", sub: "Work that has stopped, and who can unstick it", icon: "blockers" },
+    { id: "qa", label: "QA reviews", sub: "What is waiting on a QA decision", icon: "readiness" },
   ] },
   { group: "Planning", items: [
     { id: "roadmap", label: "Roadmap", sub: "What is selected for now, next and later", icon: "plan" },

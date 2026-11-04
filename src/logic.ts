@@ -331,3 +331,102 @@ export function situation(s: AppState, c: Component): string {
   if (w === "Later") return `Specified and parked, with no round scheduled.${holdsUp}`;
   return `Specified, but not picked for a round.${holdsUp}${reuse}`;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ATTENTION — the filter bar shared by every view of the roadmap.
+
+   One list, seven entries, each a question somebody actually asks. They
+   overlap on purpose (a blocked component is also at risk), so the bar shows
+   counts rather than pretending they partition the library.
+   ────────────────────────────────────────────────────────────────────────── */
+export type Attention = "all" | "unassigned" | "blocked" | "at_risk" | "review" | "in_progress" | "completed";
+
+export const ATTENTION: { id: Attention; label: string; help: string; tone: string }[] = [
+  { id: "all", label: "All", help: "Every component in the library, whatever state it is in.", tone: "neutral" },
+  { id: "unassigned", label: "Unassigned", help: "Nobody owns these. They cannot start until somebody does.", tone: "warn" },
+  { id: "blocked", label: "Blocked", help: "Something outside the work is stopping it. Each one has an open blocker with a named owner.", tone: "crit" },
+  { id: "at_risk", label: "At risk", help: "Not blocked, but the record says it will miss: a date gone past, an ETA beyond the due date, failing checks or a late prerequisite.", tone: "warn" },
+  { id: "review", label: "Ready for review", help: "The owner has submitted it. It is waiting on a reviewer or on QA, not on the owner.", tone: "review" },
+  { id: "in_progress", label: "In progress", help: "Being built right now.", tone: "info" },
+  { id: "completed", label: "Completed", help: "Checks passed, QA accepted on the exact build, deployment approved.", tone: "ok" },
+];
+
+export function matchesAttention(s: AppState, c: Component, a: Attention): boolean {
+  if (a === "all") return true;
+  if (a === "completed") return isDone(c);
+  if (a === "unassigned") return ownership(c) === "unassigned";
+  if (a === "in_progress") return c.status === "in_progress";
+  if (a === "review") return !isDone(c) && (c.review === "in_review" || c.review === "ready" || c.gates.qa.state === "awaiting" || c.gates.qa.state === "in_progress");
+  const r = risk(s, c).level;
+  return a === "blocked" ? r === "blocked" : r === "at_risk";
+}
+
+export function attentionCounts(s: AppState, cs: Component[]) {
+  const n = Object.fromEntries(ATTENTION.map(a => [a.id, 0])) as Record<Attention, number>;
+  for (const a of ATTENTION) for (const c of cs) if (matchesAttention(s, c, a.id)) n[a.id]++;
+  return n;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   SCHEDULING
+
+   Only components that carry both a recorded start and a recorded due date
+   can be placed on a timeline. The rest are named as unscheduled rather than
+   dropped somewhere plausible, because a bar in the wrong place reads as a
+   commitment nobody made.
+   ────────────────────────────────────────────────────────────────────────── */
+export const isScheduled = (c: Component) => !!(c.start && c.due);
+export const dayOf = (s: string) => new Date(s + "T00:00:00").getTime();
+export const spanDays = (c: Component) => Math.max(1, Math.round((dayOf(c.due) - dayOf(c.start)) / DAY));
+
+/** Where the recorded dates contradict each other or a prerequisite. Facts only. */
+export interface Conflict { kind: "overdue" | "slip" | "prereq_late" | "prereq_undated"; text: string; }
+export function conflicts(s: AppState, c: Component): Conflict[] {
+  const out: Conflict[] = [];
+  if (!isScheduled(c)) return out;
+  if (!isDone(c) && daysUntil(c.due) < 0) out.push({ kind: "overdue", text: `Due date passed ${-daysUntil(c.due)} days ago.` });
+  if (c.eta && c.due && dayOf(c.eta) > dayOf(c.due)) out.push({ kind: "slip", text: `The ETA is ${Math.round((dayOf(c.eta) - dayOf(c.due)) / DAY)} days after the due date.` });
+  for (const id of c.deps) {
+    const d = s.components.find(x => x.id === id);
+    if (!d || isDone(d)) continue;
+    if (!isScheduled(d)) { out.push({ kind: "prereq_undated", text: `${d.name} has to finish first but carries no dates, so this start date rests on nothing.` }); continue; }
+    if (dayOf(d.due) > dayOf(c.start)) out.push({ kind: "prereq_late", text: `${d.name} has to finish first but is not due until ${fmtDate(d.due)}, after this one is meant to start.` });
+  }
+  return out;
+}
+
+/** Two bars for the same person at the same time. Overload is a fact about dates, not a judgement. */
+export function overlaps(s: AppState, c: Component): Component[] {
+  if (!isScheduled(c) || !c.ownerId || isDone(c)) return [];
+  return s.components.filter(x => x.id !== c.id && x.ownerId === c.ownerId && isScheduled(x) && !isDone(x)
+    && dayOf(x.start) < dayOf(c.due) && dayOf(x.due) > dayOf(c.start));
+}
+
+/**
+ * The longest chain of recorded prerequisites inside the scheduled set.
+ * This is not "the critical path" for the library: most components carry no
+ * dates and 55 groups depend on each other in a loop, so no path through the
+ * whole library can be calculated. This is the longest chain that genuinely
+ * can be, and the page says so.
+ */
+export function longestChain(s: AppState): Component[] {
+  const sch = s.components.filter(isScheduled);
+  const ids = new Set(sch.map(c => c.id));
+  const memo = new Map<string, Component[]>();
+  const seen = new Set<string>();
+  const walk = (id: string): Component[] => {
+    if (memo.has(id)) return memo.get(id)!;
+    if (seen.has(id)) return [];           // a loop: stop rather than recurse
+    seen.add(id);
+    const c = sch.find(x => x.id === id)!;
+    let best: Component[] = [];
+    for (const d of c.deps) if (ids.has(d)) { const p = walk(d); if (p.length > best.length) best = p; }
+    seen.delete(id);
+    const path = [...best, c];
+    memo.set(id, path);
+    return path;
+  };
+  let best: Component[] = [];
+  for (const c of sch) { const p = walk(c.id); if (p.length > best.length) best = p; }
+  return best;
+}

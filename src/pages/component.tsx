@@ -337,7 +337,7 @@ function OnboardingTab({ c }: { c: Component }) {
             <KV k="Review by">{fmtDate(new Date(new Date(c.due + "T00:00:00").getTime() - 3 * 86400000).toISOString().slice(0, 10))}</KV>
           </dl>
         </div>
-        <div className="pack-sec pack-wide"><h4><span className="k">H</span>Acceptance criteria — what “done” means</h4>
+        <div className="pack-sec pack-wide"><h4><span className="k">H</span>Acceptance criteria, and what “done” means</h4>
           {c.criteria.length ? <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>{c.criteria.map(k => <li key={k.id}>{k.text} <span className="muted">· evidence: {k.evidenceType.toLowerCase()}</span></li>)}</ol> : <span className="muted">Not defined yet. Ask the reviewer before starting.</span>}
         </div>
       </div>

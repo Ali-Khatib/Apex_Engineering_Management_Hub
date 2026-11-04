@@ -30,12 +30,12 @@ export const DEMO_PEOPLE: Person[] = [
 
 /** Who you can sign in as, and what each one is there to show you. */
 export const DEMO_ACCOUNTS: { id: string; shows: string }[] = [
-  { id: "zyaad", shows: "The management view — the whole portfolio, every blocker, who is overloaded and what is late." },
+  { id: "zyaad", shows: "The management view: the whole portfolio, every blocker, who is overloaded and what is late." },
   { id: "ali", shows: "An admin who also builds. Owns four components and can reassign anyone." },
   { id: "farouk", shows: "Quality. Everything waiting on QA acceptance or a deployment decision." },
   { id: "lina", shows: "A senior engineer mid-build, with a blocked component and a review waiting on her." },
   { id: "maya", shows: "An engineer whose work has passed review and is queued for deployment." },
-  { id: "rami", shows: "A brand-new joiner with nothing assigned yet — what an empty account looks like." },
+  { id: "rami", shows: "A brand-new joiner with nothing assigned yet, so you can see what an empty account looks like." },
 ];
 
 const ENGINEERS = ["ali", "lina", "omar", "maya"];
@@ -129,7 +129,7 @@ export function applyDemo(state: AppState): AppState {
       reason: "Ali is moving onto the agent runtime work for this round.",
       completed: "Schema drafted, connector stub merged, local fixtures in place.",
       outstanding: "Throughput test against the agreed metric, and the failure-case test.",
-      knownIssues: "Retries are not idempotent yet — a duplicate write is possible on timeout.",
+      knownIssues: "Retries are not idempotent yet, so a duplicate write is possible on timeout.",
       checklist: [
         { id: "h1", text: "Walkthrough call completed", done: true },
         { id: "h2", text: "Repository access confirmed", done: true },
@@ -172,7 +172,7 @@ export function applyDemo(state: AppState): AppState {
   const n = (to: string, kind: any, title: string, body: string, componentId: string | undefined, age: number) =>
     state.notices.push({ id: `nt-${state.notices.length}`, to, kind, title, body, componentId, at: T(-age, 11), read: age > 3 });
   const forReview = live.filter(c => c.status === "under_review");
-  if (forReview[0]) n("lina", "review", `Review requested: ${forReview[0].name}`, `${forReview[0].id} — submitted by Ali Khatib.`, forReview[0].id, 0);
+  if (forReview[0]) n("lina", "review", `Review requested: ${forReview[0].name}`, `${forReview[0].id}, submitted by Ali Khatib.`, forReview[0].id, 0);
   if (forReview[1]) n("farouk", "review", `QA requested: ${forReview[1].name}`, "Required checks have passed. Evidence attached.", forReview[1].id, 1);
   if (blocked[1]) n("lina", "blocker", "Blocker assigned to you", "BLK-002 Schema contract not agreed", blocked[1].id, 1);
   if (blocked[0]) n("zyaad", "blocker", "Escalated blocker", "BLK-001 Waiting on the client's identity provider", blocked[0].id, 0);

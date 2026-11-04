@@ -93,12 +93,12 @@ export function SignIn() {
             <div><dt>Round</dt><dd>The set of components selected to be built next. 26 of the 127 are in the current round.</dd></div>
           </dl>
         </div>
-        <span className="signin-foot"><ThemeSwitch /> <span>Light or dark — your choice is remembered.</span></span>
+        <span className="signin-foot"><ThemeSwitch /> <span>Light or dark. Your choice is remembered.</span></span>
       </div>
       <div className="signin-form">
         <div className="signin-card">
           <h2>Sign in</h2>
-          <p className="signin-lede">Pick an account to look around with. Each one shows the platform from a different seat, and nothing you do is permanent — <b>Reset data</b> in the account menu puts it all back.</p>
+          <p className="signin-lede">Pick an account to look around with. Each one shows the platform from a different seat, and nothing you do is permanent. <b>Reset data</b> in the account menu puts it all back.</p>
           <div className="who-list">
             {demo.map(a => (
               <button key={a.id} className="who" onClick={() => signIn(a.id)}>

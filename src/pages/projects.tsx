@@ -85,7 +85,7 @@ function Architecture({ p, cs }: { p: Project; cs: Component[] }) {
               <circle cx="15" cy="20" r="4" style={{ fill: STATUS_COLOR[c.status] }} />
               <text x="25" y="24" className="a-t2">{plat ? "SHARED · " : ""}{c.id}</text>
               <text x="14" y="44" className="a-t1">{trunc(c.name, 26)}</text>
-              <title>{`${c.name} — ${STATUS_LABEL[c.status]} — ${o ? personName(o) : "Unassigned"}`}</title>
+              <title>{`${c.name}. ${STATUS_LABEL[c.status]}. ${o ? personName(o) : "Unassigned"}`}</title>
             </g>
           );
         }))}

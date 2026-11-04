@@ -18,20 +18,32 @@ export function Primer() {
         <h2>What you are looking at</h2>
         <button className="primer-x" onClick={dismiss} aria-label="Hide this explanation"><Icon name="x" size={14} /></button>
       </div>
-      <ol className="primer-steps">
-        <li>
-          <b>A component</b> is one unit of engineering work — an audit trail, a connector, a schema registry.
-          One person owns it, one person reviews it. There are <b>127</b> of them, and everything on this site hangs off that one idea.
-        </li>
-        <li>
-          <b>A platform module</b> is something Apex has already built and can reuse. <b>SP-01 to SP-20.</b> Most
-          components extend a module rather than starting from nothing, which is why you keep seeing SP numbers.
-        </li>
-        <li>
-          <b>A round</b> is the set of components chosen to be built next. Only those have owners and dates.
-          The rest are specified and waiting.
-        </li>
-      </ol>
+      {/* Three definitions, not three steps. They were numbered 1-2-3, which
+          told the reader to expect an order that does not exist. A definition
+          list says what they actually are. */}
+      <dl className="primer-defs">
+        <div>
+          <dt>A component</dt>
+          <dd>
+            One unit of engineering work: an audit trail, a connector, a schema registry.
+            One person owns it, one person reviews it. There are <b>127</b> of them, and everything on this site hangs off that one idea.
+          </dd>
+        </div>
+        <div>
+          <dt>A platform module</dt>
+          <dd>
+            Something Apex has already built and can reuse, numbered <b>SP-01 to SP-20</b>. Most components
+            extend a module rather than starting from nothing, which is why you keep seeing SP numbers.
+          </dd>
+        </div>
+        <div>
+          <dt>A round</dt>
+          <dd>
+            The set of components chosen to be built next. Only those have owners and dates.
+            The rest are specified and waiting.
+          </dd>
+        </div>
+      </dl>
       <p className="primer-gates">
         A component ships only after <b>three separate approvals</b>: automated checks pass, then QA accepts the
         exact build, then someone approves deployment. Passing the checks never means QA has accepted it.

@@ -225,7 +225,7 @@ function GraphView({ model, focus, setFocus }: { model: ReturnType<typeof analys
 
       {c && (
         <p className="gv-sit">
-          <b>{c.name}</b> — {situation(state, c)}{" "}
+          <b>{c.name}</b>. {situation(state, c)}{" "}
           <a href={"#c-" + c.id}>Open the component</a>
         </p>
       )}

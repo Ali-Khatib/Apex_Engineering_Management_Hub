@@ -99,7 +99,7 @@ export function DepGraph({ model, focus, onFocus }: {
     return (
       <g transform={`translate(${n.x} ${n.y})`} className="dg-g" onClick={() => onFocus(d.id)} role="button" tabIndex={0}
         onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onFocus(d.id); } }}>
-        <title>{d.name} — {isDone(d) ? "completed" : d.ownerId ? `owned by ${personName(person(d.ownerId))}` : "no owner"}</title>
+        <title>{d.name}. {isDone(d) ? "completed" : d.ownerId ? `owned by ${personName(person(d.ownerId))}` : "no owner"}</title>
         <rect className={cx("dg-n", isDone(d) && "done", !d.ownerId && !isDone(d) && "noown", loop && "loop")} width={NW} height={NH} rx="9" />
         <text className="dg-n-id" x="11" y="18">{d.id}</text>
         <text className="dg-n-name" x="11" y="33">{d.name.length > 26 ? d.name.slice(0, 25) + "…" : d.name}</text>

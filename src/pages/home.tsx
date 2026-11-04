@@ -98,7 +98,7 @@ export function Home() {
       <section className="ownstrip" aria-label="Who owns the work">
         <div className="ownstrip-head">
           <h2>Who owns the work <span>across all {cs.length}</span></h2>
-          <p>Every one of the {cs.length} components is in exactly one of these. Responsibility and progress are different questions — a component can be half-built and still have nobody's name on it.</p>
+          <p>Every one of the {cs.length} components is in exactly one of these. Responsibility and progress are different questions. A component can be half-built and still have nobody's name on it.</p>
         </div>
         <div className="ownstrip-row">
           {OWNERSHIP_ORDER.map(o => (
@@ -118,12 +118,12 @@ export function Home() {
         </div>
         <div className="pipe-row">
           {([
-            ["Checks passed", cs.filter(x => x.gates.checks.state === "passed").length, "the pipeline ran and succeeded", "ok"],
+            ["Checks passed", cs.filter(x => x.gates.checks.state === "passed").length, "the pipeline ran and succeeded", "plain"],
             ["Checks failing", cs.filter(x => x.gates.checks.state === "failed").length, "needs the owner, not QA", "crit"],
-            ["Awaiting QA", cs.filter(x => ["awaiting", "in_progress"].includes(x.gates.qa.state)).length, "a QA decision is outstanding", "warn"],
-            ["QA accepted", cs.filter(x => x.gates.qa.state === "accepted").length, "accepted on the exact build", "ok"],
-            ["Awaiting deployment", cs.filter(x => x.gates.qa.state === "accepted" && !["ready", "scheduled", "deployed"].includes(x.gates.deploy.state)).length, "QA done, approval outstanding", "review"],
-            ["Deployed", cs.filter(x => x.gates.deploy.state === "deployed").length, "shipped", "ok"],
+            ["Awaiting QA", cs.filter(x => ["awaiting", "in_progress"].includes(x.gates.qa.state)).length, "a QA decision is outstanding", "plain"],
+            ["QA accepted", cs.filter(x => x.gates.qa.state === "accepted").length, "accepted on the exact build", "plain"],
+            ["Awaiting deployment", cs.filter(x => x.gates.qa.state === "accepted" && !["ready", "scheduled", "deployed"].includes(x.gates.deploy.state)).length, "QA done, approval outstanding", "plain"],
+            ["Deployed", cs.filter(x => x.gates.deploy.state === "deployed").length, "shipped", "plain"],
           ] as [string, number, string, string][]).map(([label, n, foot, tone]) => (
             <button key={label} className={cx("pipebox", "p-" + tone)} onClick={() => go("qa")}>
               <strong>{n}</strong><span>{label}</span><small>{foot}</small>

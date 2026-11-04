@@ -99,7 +99,7 @@ export function Roadmap() {
           <label className="fsel"><span>Planning wave</span>
             <select value={wave} onChange={e => setWave(e.target.value)}>
               <option value="">Any wave</option>
-              {WAVES.filter(w => waveCounts[w.id]).map(w => <option key={w.id} value={w.id}>{w.label} ({waveCounts[w.id]}) — {w.hint}</option>)}
+              {WAVES.filter(w => waveCounts[w.id]).map(w => <option key={w.id} value={w.id}>{w.label} ({waveCounts[w.id]}): {w.hint}</option>)}
             </select>
           </label>
           <label className="fsel"><span>Owner</span>

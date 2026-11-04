@@ -37,7 +37,7 @@ export function Components() {
   return (
     <>
       <header className="ph ph-row">
-        <div><h1>Components</h1><p className="lede">All 127 components, grouped by platform layer. Start with who owns each one — unassigned work is the only kind that cannot move — then narrow by layer, module or roadmap stage.</p></div>
+        <div><h1>Components</h1><p className="lede">All 127 components, grouped by platform layer. Start with who owns each one, because unassigned work is the only kind that cannot move. Then narrow by layer, module or roadmap stage.</p></div>
         {isAdmin && <Button variant="primary" icon="plus" onClick={() => setNewOpen(true)}>Add a component</Button>}
       </header>
 

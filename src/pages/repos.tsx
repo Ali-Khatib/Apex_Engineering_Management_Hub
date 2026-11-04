@@ -133,9 +133,9 @@ export function Readiness() {
       <PageHeader title="Readiness gates" sub="Three gates tracked independently: automated checks from GitHub, QA acceptance by an authorised reviewer, and deployment approval by an admin. Passing CI never moves QA."
         actions={<select value={proj} onChange={e => setProj(e.target.value)} style={{ width: "auto" }} aria-label="Project"><option value="">All projects</option>{state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>} />
       <div className="gate-cards">
-        <div className="gate-card"><h4><span className="gate-num">1</span>Checks passed</h4><div className="row" style={{ gap: 18 }}>{(["passed", "failed", "running", "pending"] as const).map(s => <div key={s}><div className="kpi-value" style={{ fontSize: 26, color: s === "failed" && g("checks", s) ? "var(--crit)" : undefined }}>{g("checks", s)}</div><span className="meta">{label(s)}</span></div>)}</div></div>
-        <div className="gate-card"><h4><span className="gate-num">2</span>QA accepted</h4><div className="row" style={{ gap: 18 }}>{(["accepted", "in_progress", "awaiting", "changes_requested"] as const).map(s => <div key={s}><div className="kpi-value" style={{ fontSize: 26 }}>{g("qa", s)}</div><span className="meta">{label(s)}</span></div>)}</div></div>
-        <div className="gate-card"><h4><span className="gate-num">3</span>Ready for deployment</h4><div className="row" style={{ gap: 18 }}>{(["deployed", "ready", "not_ready"] as const).map(s => <div key={s}><div className="kpi-value" style={{ fontSize: 26 }}>{g("deploy", s)}</div><span className="meta">{label(s)}</span></div>)}</div></div>
+        <div className="gate-card"><h4><span className="gate-num">1</span>Checks passed</h4><div className="row" style={{ gap: 18 }}>{(["passed", "failed", "running", "pending"] as const).map(s => <div key={s}><div className="kpi-value" style={{ fontSize: 24, color: s === "failed" && g("checks", s) ? "var(--crit)" : undefined }}>{g("checks", s)}</div><span className="meta">{label(s)}</span></div>)}</div></div>
+        <div className="gate-card"><h4><span className="gate-num">2</span>QA accepted</h4><div className="row" style={{ gap: 18 }}>{(["accepted", "in_progress", "awaiting", "changes_requested"] as const).map(s => <div key={s}><div className="kpi-value" style={{ fontSize: 24 }}>{g("qa", s)}</div><span className="meta">{label(s)}</span></div>)}</div></div>
+        <div className="gate-card"><h4><span className="gate-num">3</span>Ready for deployment</h4><div className="row" style={{ gap: 18 }}>{(["deployed", "ready", "not_ready"] as const).map(s => <div key={s}><div className="kpi-value" style={{ fontSize: 24 }}>{g("deploy", s)}</div><span className="meta">{label(s)}</span></div>)}</div></div>
       </div>
       <div className="board">
         {lanes.map(l => {
@@ -151,7 +151,7 @@ export function Readiness() {
                   <span className="row-between" style={{ fontSize: 12 }}><PersonChip id={c.ownerId} size={18} /><span className="muted">{c.criteria.filter(k => k.status === "accepted").length}/{c.criteria.length} AC</span></span>
                 </a>
               ))}
-              {items.length === 0 && <span className="muted" style={{ fontSize: 12.5, padding: "8px 4px" }}>Nothing here</span>}
+              {items.length === 0 && <span className="muted" style={{ fontSize: 12, padding: "8px 4px" }}>Nothing here</span>}
             </div>
           );
         })}

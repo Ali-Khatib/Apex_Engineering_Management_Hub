@@ -41,36 +41,53 @@ export function Components() {
         {isAdmin && <Button variant="primary" icon="plus" onClick={() => setNewOpen(true)}>Add a component</Button>}
       </header>
 
-      <div className="segs-wrap">
-        <div className="segs" role="group" aria-label="Who owns it">
-          <button className="seg" aria-pressed={f.quick === "all"} onClick={() => set({ quick: "all" })}>All <b>{state.components.length}</b></button>
+      {/* The same filter bar the Roadmap uses. Two list pages with two
+          different filter grammars read as two products. */}
+      <div className="fbar">
+        <div className="fbar-att" role="group" aria-label="Who owns it">
+          <button className={cx("fchip", f.quick === "all" && "on")} aria-pressed={f.quick === "all"} onClick={() => set({ quick: "all" })}>All<b>{state.components.length}</b></button>
           {OWNERSHIP_ORDER.map(o => (
-            <button key={o} className="seg" aria-pressed={f.quick === o} onClick={() => set({ quick: f.quick === o ? "all" : o })} title={OWNERSHIP[o].help}>
-              <i className={cx("seg-mark", "m-" + o)} aria-hidden />{OWNERSHIP[o].label} <b>{own[o]}</b>
+            <button key={o} className={cx("fchip", "a-" + (o === "unassigned" ? "warn" : "neutral"), f.quick === o && "on")}
+              aria-pressed={f.quick === o} onClick={() => set({ quick: f.quick === o ? "all" : o })} title={OWNERSHIP[o].help}>
+              {OWNERSHIP[o].label}<b>{own[o]}</b>
             </button>
           ))}
         </div>
-        <span className="segs-note">{f.quick !== "all" && OWNERSHIP[f.quick as Ownership] ? OWNERSHIP[f.quick as Ownership].help : "Who is responsible, separately from how far along the work is."}</span>
-      </div>
 
-      <div className="layerbar" role="group" aria-label="Platform layer">
-        {LAYER_ORDER.map(k => {
-          const n = state.components.filter(c => c.lib?.layer === k).length; if (!n) return null;
-          const on = f.category === LAYERS[k].name;
-          return <button key={k} className={cx("lchip", on && "on")} onClick={() => set({ category: on ? "" : LAYERS[k].name })} aria-pressed={on}>{LAYERS[k].name}<span>{n}</span></button>;
-        })}
-      </div>
+        <div className="fbar-att fbar-layers" role="group" aria-label="Platform layer">
+          {LAYER_ORDER.map(k => {
+            const n = state.components.filter(c => c.lib?.layer === k).length; if (!n) return null;
+            const on = f.category === LAYERS[k].name;
+            return <button key={k} className={cx("fchip", on && "on")} onClick={() => set({ category: on ? "" : LAYERS[k].name })} aria-pressed={on}>{LAYERS[k].name}<b>{n}</b></button>;
+          })}
+        </div>
 
-      <div className="filters">
-        <div className="input-ic" style={{ flex: "1 1 240px" }}><Icon name="search" size={15} /><input type="search" placeholder="Search by name, ID or SP number" value={f.q} onChange={e => set({ q: e.target.value })} aria-label="Search the library" /></div>
-        <select value={f.sp} onChange={e => set({ sp: e.target.value })} aria-label="Builds on module"><option value="">Any SP module</option>{state.modules.map(m => <option key={m.id} value={m.id}>{m.id} · {m.name}</option>)}</select>
-        <select value={f.wave} onChange={e => set({ wave: e.target.value })} aria-label="Roadmap"><option value="">Any roadmap stage</option>{WAVES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>
-        <select value={f.project} onChange={e => set({ project: e.target.value })} aria-label="Source list"><option value="">All source lists</option>{state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-        <select value={f.owner} onChange={e => set({ owner: e.target.value })} aria-label="Owner"><option value="">Anyone</option><option value="__none">No owner yet</option>{state.people.map(p => <option key={p.id} value={p.id}>{personName(p)}</option>)}</select>
-        {active && <Button variant="ghost" icon="x" onClick={() => setFilter(EMPTY_FILTER)}>Clear</Button>}
-      </div>
+        <div className="fbar-row">
+          <label className="fsearch">
+            <Icon name="search" size={14} />
+            <input type="search" placeholder="Search by name, ID or SP number" value={f.q} onChange={e => set({ q: e.target.value })} aria-label="Search the library" />
+            {f.q && <button onClick={() => set({ q: "" })} aria-label="Clear search"><Icon name="x" size={12} /></button>}
+          </label>
+          <label className="fsel"><span>Platform module</span>
+            <select value={f.sp} onChange={e => set({ sp: e.target.value })}><option value="">Any module</option>{state.modules.map(m => <option key={m.id} value={m.id}>{m.id} · {m.name}</option>)}</select>
+          </label>
+          <label className="fsel"><span>Planning wave</span>
+            <select value={f.wave} onChange={e => set({ wave: e.target.value })}><option value="">Any wave</option>{WAVES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>
+          </label>
+          <label className="fsel"><span>Source list</span>
+            <select value={f.project} onChange={e => set({ project: e.target.value })}><option value="">All source lists</option>{state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+          </label>
+          <label className="fsel"><span>Owner</span>
+            <select value={f.owner} onChange={e => set({ owner: e.target.value })}><option value="">Anyone</option><option value="__none">No owner yet</option>{state.people.map(p => <option key={p.id} value={p.id}>{personName(p)}</option>)}</select>
+          </label>
+          {active && <button className="fclear" onClick={() => setFilter(EMPTY_FILTER)}>Clear filters</button>}
+        </div>
 
-      <div className="count-line">{list.length} of {state.components.length} components</div>
+        <p className="fbar-sum">
+          <b>{list.length}</b> of {state.components.length} components
+          {f.quick !== "all" && OWNERSHIP[f.quick as Ownership] && <> · {OWNERSHIP[f.quick as Ownership].help}</>}
+        </p>
+      </div>
       {list.length === 0 ? <Empty icon="filter" title="Nothing matches" action={<Button onClick={() => setFilter(EMPTY_FILTER)}>Show everything</Button>} /> : (
         <div className="table-card">
           {LAYER_ORDER.map(k => {

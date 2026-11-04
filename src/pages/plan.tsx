@@ -150,7 +150,7 @@ export function Plan({ initialTab = "timeline" }: { initialTab?: "timeline" | "d
                   <div className="row-between"><b>{m.name}</b>{isAdmin && <Button size="sm" variant="ghost" icon="edit" aria-label={`Edit ${m.name}`} onClick={() => setMs(m)} />}</div>
                   <span className="muted" style={{ fontSize: 13 }}>{fmtDate(m.date)} · {d < 0 ? `${-d} days ago` : d === 0 ? "today" : `in ${d} days`} · {done}/{mc.length} components done</span>
                   <div className="progress"><i style={{ width: `${mc.length ? done / mc.length * 100 : 0}%` }} /></div>
-                  {late > 0 && d >= 0 && <span style={{ color: "var(--crit)", fontSize: 12.5 }}><Icon name="alert" size={12} /> {late} component{late > 1 ? "s have ETAs" : " has an ETA"} after this date</span>}
+                  {late > 0 && d >= 0 && <span style={{ color: "var(--crit)", fontSize: 12 }}><Icon name="alert" size={12} /> {late} component{late > 1 ? "s have ETAs" : " has an ETA"} after this date</span>}
                 </div>
               );
             })}

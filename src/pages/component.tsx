@@ -81,7 +81,7 @@ export function ComponentPage({ id }: { id: string }) {
 
         <dl className="summary summary-5">
           <div><dt>Lifecycle <i className="dt-q" title="How far the work has actually got. Derived from owner, dependencies and status.">?</i></dt><dd><LifecyclePill c={c} help /></dd></div>
-          <div><dt>Planning wave <i className="dt-q" title="The source sheet's planning classification, from the component map of 20 October 2026. Independent of lifecycle.">?</i></dt><dd><WaveTag wave={c.lib?.wave} /> <span className="muted" style={{ fontSize: 12.5 }}>{WAVES.find(w => w.id === c.lib?.wave)?.hint}</span></dd></div>
+          <div><dt>Planning wave <i className="dt-q" title="The source sheet's planning classification, from the component map of 20 October 2026. Independent of lifecycle.">?</i></dt><dd><WaveTag wave={c.lib?.wave} /> <span className="muted" style={{ fontSize: 12 }}>{WAVES.find(w => w.id === c.lib?.wave)?.hint}</span></dd></div>
           <div><dt>Owner</dt><dd><PersonChip id={c.ownerId} /></dd></div>
           <div><dt>Builds on</dt><dd className="spwrap">{c.lib?.sps.length ? c.lib.sps.map(s => <SpChip key={s} id={s} />) : <span className="muted">No SP module yet</span>}</dd></div>
           <div><dt>Ready to ship?</dt><dd><GateDots c={c} showLabel /></dd></div>
@@ -310,15 +310,15 @@ function OnboardingTab({ c }: { c: Component }) {
           <div className="grid-2" style={{ gap: 20 }}>
             <Markdown src={c.onboarding.setup} />
             <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
-              {c.onboarding.tools.length > 0 && <div><span className="muted" style={{ fontSize: 12.5 }}>Required tools</span><div className="row" style={{ gap: 4, marginTop: 6 }}>{c.onboarding.tools.map(t => <Pill key={t} tone="faint">{t}</Pill>)}</div></div>}
-              {c.onboarding.env.length > 0 && <div><span className="muted" style={{ fontSize: 12.5 }}>Environment variables · names and purpose only, values live in Vault</span>
+              {c.onboarding.tools.length > 0 && <div><span className="muted" style={{ fontSize: 12 }}>Required tools</span><div className="row" style={{ gap: 4, marginTop: 6 }}>{c.onboarding.tools.map(t => <Pill key={t} tone="faint">{t}</Pill>)}</div></div>}
+              {c.onboarding.env.length > 0 && <div><span className="muted" style={{ fontSize: 12 }}>Environment variables · names and purpose only, values live in Vault</span>
                 <table className="envs" style={{ marginTop: 6 }}><tbody>{c.onboarding.env.map(e => <tr key={e.name}><td><code>{e.name}</code></td><td className="muted">{e.purpose}</td></tr>)}</tbody></table></div>}
             </div>
           </div>
         </div>
         <div className="pack-sec"><h4><span className="k">D</span>Dependencies</h4>
           {deps.length ? <div className="deps">{deps.map(d => <a key={d.id} href={"#c-" + d.id} className="dep"><span className="dep-name"><span>{d.name}</span><small>Owner {personName(person(d.ownerId))}</small></span><StatusPill s={d.status} /></a>)}</div> : <span className="muted">None. You can start immediately.</span>}
-          {repo && repo.frameworks.length > 0 && <div style={{ marginTop: 12 }}><span className="muted" style={{ fontSize: 12.5 }}>Libraries & frameworks</span><div className="row" style={{ gap: 4, marginTop: 6 }}>{repo.frameworks.map(f => <Pill key={f} tone="neutral">{f}</Pill>)}</div></div>}
+          {repo && repo.frameworks.length > 0 && <div style={{ marginTop: 12 }}><span className="muted" style={{ fontSize: 12 }}>Libraries & frameworks</span><div className="row" style={{ gap: 4, marginTop: 6 }}>{repo.frameworks.map(f => <Pill key={f} tone="neutral">{f}</Pill>)}</div></div>}
         </div>
         <div className="pack-sec"><h4><span className="k">E</span>Responsibilities</h4>
           <dl>
@@ -328,7 +328,7 @@ function OnboardingTab({ c }: { c: Component }) {
             <KV k="Project manager"><PersonChip id={repo?.pmId} /></KV>
           </dl>
         </div>
-        <div className="pack-sec"><h4><span className="k">F</span>Expected deliverable</h4><p style={{ fontSize: 14.5, color: "var(--fg)" }}>{c.deliverable}</p></div>
+        <div className="pack-sec"><h4><span className="k">F</span>Expected deliverable</h4><p style={{ fontSize: 14, color: "var(--fg)" }}>{c.deliverable}</p></div>
         <div className="pack-sec"><h4><span className="k">G</span>Dates</h4>
           <dl>
             <KV k="Start">{fmtDate(c.start)}</KV>
@@ -388,7 +388,7 @@ function AcceptanceTab({ c }: { c: Component }) {
         <div className={cx("gate-card", g.checks.state === "passed" && "on", g.checks.state === "failed" && "bad")}>
           <h4><span className="gate-num">1</span>Checks passed<Pill tone={CHECK_TONE[g.checks.state]} className="" >{label(g.checks.state)}</Pill></h4>
           <span className="meta">From GitHub Actions{g.checks.commit ? <> on <code className="sha">{g.checks.commit.slice(0, 7)}</code></> : ""}{g.checks.at ? ` · ${ago(g.checks.at)}` : ""}</span>
-          {repo?.github.runs.length ? <div style={{ display: "grid", gap: 4 }}>{repo.github.runs.map(run => <div key={run.name} className="row-between" style={{ fontSize: 12.5 }}><span className="row" style={{ gap: 6 }}><i className="pill-dot" style={{ color: `var(--${CHECK_TONE[run.state] === "ok" ? "ok" : CHECK_TONE[run.state] === "crit" ? "crit" : "fg-4"})` }} />{run.name}{run.required && <span className="muted">required</span>}</span><span className="muted">{label(run.state)}</span></div>)}</div> : <span className="meta">{repo ? "No runs yet." : "Link a repository to track checks."}</span>}
+          {repo?.github.runs.length ? <div style={{ display: "grid", gap: 4 }}>{repo.github.runs.map(run => <div key={run.name} className="row-between" style={{ fontSize: 12 }}><span className="row" style={{ gap: 6 }}><i className="pill-dot" style={{ color: `var(--${CHECK_TONE[run.state] === "ok" ? "ok" : CHECK_TONE[run.state] === "crit" ? "crit" : "fg-4"})` }} />{run.name}{run.required && <span className="muted">required</span>}</span><span className="muted">{label(run.state)}</span></div>)}</div> : <span className="meta">{repo ? "No runs yet." : "Link a repository to track checks."}</span>}
           <span className="meta" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}><Icon name="lock" size={12} /> Read-only. Never changes QA status.</span>
         </div>
         <div className={cx("gate-card", g.qa.state === "accepted" && "on", ["rejected", "changes_requested"].includes(g.qa.state) && "bad")}>
@@ -470,7 +470,7 @@ function EvidenceItem({ c, k, e, canReview }: { c: Component; k: Criterion; e: E
         <Icon name={icon} size={15} /><b style={{ fontWeight: 500 }}>{e.label}</b><Pill tone="faint">v{e.version}</Pill>
         {e.decision && <Pill tone={e.decision === "approved" ? "ok" : e.decision === "rejected" ? "crit" : "warn"}>{e.decision === "approved" ? "Approved" : e.decision === "rejected" ? "Rejected" : "Changes requested"}</Pill>}
       </div>
-      <span className="muted" style={{ fontSize: 12.5 }}>
+      <span className="muted" style={{ fontSize: 12 }}>
         {/^https?:/.test(e.ref) ? <a href={e.ref} target="_blank" rel="noopener">{e.ref}</a> : <code>{e.ref}</code>} · submitted by {personName(person(e.by))} {ago(e.at)}
       </span>
       {e.decision && <p className="ev-note"><b>{personName(person(e.reviewerId))}</b> · {fmtDateTime(e.reviewedAt)}{e.note ? ` — ${e.note}` : ""}</p>}
@@ -550,7 +550,7 @@ function GithubTab({ c }: { c: Component }) {
         <a className="repo-name" href={repo.url} target="_blank" rel="noopener">{repo.org}/{repo.name}</a>
         <Pill tone="faint">{repo.visibility}</Pill>
         <span className="muted" style={{ fontSize: 13 }}>{repo.description}</span>
-        <span style={{ marginLeft: "auto" }} className="row"><Pill tone={CHECK_TONE[repo.ci]} dot>CI {repo.ci}</Pill><span className="muted" style={{ fontSize: 12.5 }}>{gh.branches.length} branches · {gh.contributors.length} contributors</span></span>
+        <span style={{ marginLeft: "auto" }} className="row"><Pill tone={CHECK_TONE[repo.ci]} dot>CI {repo.ci}</Pill><span className="muted" style={{ fontSize: 12 }}>{gh.branches.length} branches · {gh.contributors.length} contributors</span></span>
       </div>
       <div style={{ padding: "0 12px" }}><Tabs size="sm" value={sub} onChange={setSub} tabs={[{ id: "readme", label: "README.md", icon: "file" }, { id: "commits", label: "Commits", count: gh.commits.length }, { id: "prs", label: "Pull requests", count: gh.prs.filter(p => p.state === "open").length }, { id: "issues", label: "Issues", count: gh.issues.filter(i => i.state === "open").length }, { id: "checks", label: "Checks", count: gh.runs.length }]} /></div>
       {sub === "readme" && <div className="panel-body"><Markdown src={gh.readme} /></div>}
@@ -738,7 +738,7 @@ function DesignsTab({ c }: { c: Component }) {
       {cur && (
         <Modal title={`${cur.n} · ${cur.title}`} sub={`${c.id} ${c.name}`} onClose={() => setOpen(null)} wide>
           <ProtectedViewer src={src(cur.n)} mark={`${me?.email} · ${new Date().toLocaleDateString("en-GB")}`} />
-          <p className="muted" style={{ fontSize: 13.5 }}>{cur.caption}</p>
+          <p className="muted" style={{ fontSize: 13 }}>{cur.caption}</p>
         </Modal>
       )}
     </div>

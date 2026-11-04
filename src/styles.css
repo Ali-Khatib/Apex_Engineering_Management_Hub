@@ -1506,8 +1506,11 @@ input[type=text], input[type=email], input[type=date], input[type=url], input[ty
         font-size: 12px; font-weight: 500; flex: none; white-space: nowrap; border: 0; }
 .w-now  { background: var(--neutral-bg); color: var(--neutral-ink); }
 .w-must { background: var(--brand-wash); color: var(--brand-ink); }
-.w-next { background: transparent; color: var(--fg-3); box-shadow: inset 0 0 0 1px var(--line-strong); }
-.w-later, .w-out { background: transparent; color: var(--fg-4); box-shadow: inset 0 0 0 1px var(--line); }
+/* A 1px outlined rectangle at this size is the shape of a small input, and in
+   a table sitting under a row of selects these read as disabled controls. A
+   wave is a label you cannot edit here, so it is set as a tint, never a ring. */
+.w-next { background: var(--surface-3); color: var(--fg-2); }
+.w-later, .w-out { background: transparent; color: var(--fg-4); padding-left: 0; padding-right: 7px; }
 .w-hold, .w-decide { background: var(--warn-bg); color: var(--warn); }
 .ltag { background: none !important; box-shadow: none !important; border: 0; color: var(--fg-3); font-size: 12px; font-weight: 400; }
 .ltag i { display: none; }
@@ -2952,3 +2955,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 @media (max-width: 720px) { .primer-defs > div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
 /* A pipeline stage is not a verdict. Only bad news carries a hue. */
 .pipebox.p-plain strong { color: var(--fg); }
+/* The layer taxonomy is nine entries, so it gets its own row rather than
+   crowding the ownership row it would otherwise wrap into. */
+.fbar-layers { padding-top: 1px; }
+.fbar-layers .fchip { font-size: 12px; height: 29px; padding: 0 11px; }

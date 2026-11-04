@@ -123,7 +123,7 @@ export function SignIn() {
                 <Field label="Work email" error={err.email} full><input type="email" autoComplete="email" placeholder="name@apexaiarabia.com" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
               </div>
               <Button variant="primary" type="submit" iconRight="arrowRight">Create profile</Button>
-              <p className="muted" style={{ fontSize: 12.5 }}>New profiles join as members with nothing assigned. Admins can change roles under Team.</p>
+              <p className="muted" style={{ fontSize: 12 }}>New profiles join as members with nothing assigned. Admins can change roles under Team.</p>
             </form>
           )}
         </div>

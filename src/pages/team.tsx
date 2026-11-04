@@ -32,7 +32,7 @@ export function Team() {
                     <select value={p.role} onChange={e => { updatePerson(p.id, { role: e.target.value as Role }); toast(`${p.first} is now ${e.target.value === "admin" ? "an admin" : "a member"}`); }} style={{ width: 120, height: 32 }} aria-label={`Role for ${personName(p)}`}><option value="admin">Admin</option><option value="member">Member</option></select>
                   ) : <Pill tone={p.role === "admin" ? "brand" : "faint"}>{p.role === "admin" ? "Admin" : "Member"}</Pill>}</td>
                   <td>{owned[0] ? <a href={"#c-" + owned[0].id} className="comp-link"><code className="cid">{owned[0].id}</code><span>{owned[0].name}</span></a> : <span className="muted">—</span>}</td>
-                  <td className="num"><span style={{ color: owned.length > 1 ? "var(--warn)" : undefined, fontWeight: owned.length > 1 ? 600 : undefined }} title={owned.length > 1 ? "More than one active component" : undefined}>{owned.length}</span></td>
+                  <td className="num">{owned.length}</td>
                   <td className="num">{reviewing}</td>
                   {isAdmin && <td style={{ textAlign: "right" }}>{p.id !== me?.id && <ConfirmButton label="Remove" confirmText="Remove" onConfirm={() => { removePerson(p.id); toast(`${p.first} removed. Their components are now unassigned.`); }} />}</td>}
                 </tr>
@@ -40,7 +40,7 @@ export function Team() {
             })}</tbody>
           </table></div>}
       </section>
-      <p className="muted" style={{ fontSize: 12.5 }}>Guideline: one primary component per engineer. Counts above one are highlighted so assignments can be balanced.</p>
+      <p className="muted" style={{ fontSize: 12 }}>Apex has not recorded a limit on how many components one person should own at a time, so no count here is marked high or low. Active counts what somebody owns and has not finished; Reviewing counts what is waiting on their review.</p>
       {add && <AddPerson onClose={() => setAdd(false)} />}
     </>
   );

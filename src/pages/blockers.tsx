@@ -130,7 +130,7 @@ export function HandoffCard({ h }: { h: Handoff }) {
         <div><div className="muted" style={{ fontSize: 12 }}>Known issues</div>{h.knownIssues}</div>
       </div>
       <div className="checklist">
-        <div className="row-between"><span className="muted" style={{ fontSize: 12.5 }}>Handover checklist · {done}/{h.checklist.length}</span></div>
+        <div className="row-between"><span className="muted" style={{ fontSize: 12 }}>Handover checklist · {done}/{h.checklist.length}</span></div>
         {h.checklist.map(it => (
           <label key={it.id} className="check" style={{ opacity: h.status === "completed" ? .75 : 1 }}>
             <input type="checkbox" checked={it.done} disabled={h.status === "completed" || !(isNew || isAdmin || h.fromId === me?.id)} onChange={() => toggleHandoffItem(h.id, it.id)} />
@@ -139,8 +139,8 @@ export function HandoffCard({ h }: { h: Handoff }) {
         ))}
       </div>
       {h.status !== "completed" && (isNew ? (
-        <div className="row"><Button variant="primary" icon="check" disabled={!all} onClick={() => { ackHandoff(h.id); toast("Handoff acknowledged. You now own this component."); }}>Acknowledge handoff</Button>{!all && <span className="muted" style={{ fontSize: 12.5 }}>Tick every item to acknowledge.</span>}</div>
-      ) : <span className="muted" style={{ fontSize: 12.5 }}>Waiting for {person(h.toId)?.first} to tick the checklist and acknowledge.</span>)}
+        <div className="row"><Button variant="primary" icon="check" disabled={!all} onClick={() => { ackHandoff(h.id); toast("Handoff acknowledged. You now own this component."); }}>Acknowledge handoff</Button>{!all && <span className="muted" style={{ fontSize: 12 }}>Tick every item to acknowledge.</span>}</div>
+      ) : <span className="muted" style={{ fontSize: 12 }}>Waiting for {person(h.toId)?.first} to tick the checklist and acknowledge.</span>)}
     </div>
   );
 }

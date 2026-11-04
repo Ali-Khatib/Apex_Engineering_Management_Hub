@@ -156,7 +156,7 @@ export function AssignModal({ c, onClose }: { c: Component; onClose: () => void 
   const ownerLoad = ownerId ? load(ownerId) - (c.ownerId === ownerId ? 1 : 0) : 0;
   return (
     <Modal title="Assign people" sub={`${c.id} · ${c.name}`} onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={save} icon="check">{needsHandoff ? "Start handoff" : "Save assignment"}</Button></>}>
-      <Field label="Owner" hint={ownerId ? (ownerLoad > 0 ? `Already owns ${ownerLoad} active component${ownerLoad > 1 ? "s" : ""}. Guideline: one primary component per engineer.` : "No other active components. Good fit as primary owner.") : "Leave unassigned to list it under Unassigned work."}>
+      <Field label="Owner" hint={ownerId ? (ownerLoad > 0 ? `Already owns ${ownerLoad} active component${ownerLoad > 1 ? "s" : ""}. Apex has not recorded a limit, so this is a fact rather than a warning.` : "Owns nothing else that is still open.") : "Leave unassigned to list it under Unassigned work."}>
         <PersonSelect value={ownerId} onChange={setOwner} />
       </Field>
       <Field label="Reviewer" error={err.reviewer}><PersonSelect value={reviewerId} onChange={setReviewer} emptyLabel="No reviewer" /></Field>

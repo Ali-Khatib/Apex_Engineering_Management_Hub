@@ -49,7 +49,7 @@ export function About() {
               <div key={p.id} style={{ display: "grid", gap: 4 }}>
                 <div className="row-between"><b>{p.name}</b><Pill tone="faint">{p.code}</Pill></div>
                 <span className="muted" style={{ fontSize: 13 }}>{p.summary}</span>
-                <span style={{ fontSize: 12.5 }} className="muted">{p.client} · lead {personName(person(p.leadId))} · {state.components.filter(c => c.projectId === p.id).length} components</span>
+                <span style={{ fontSize: 12 }} className="muted">{p.client} · lead {personName(person(p.leadId))} · {state.components.filter(c => c.projectId === p.id).length} components</span>
               </div>
             ))}</div>
           </Section>

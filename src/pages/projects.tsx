@@ -225,7 +225,7 @@ export function ProjectPage({ id }: { id: string }) {
               <Meter label="QA accepted" v={cs.filter(c => c.gates.qa.state === "accepted").length} n={cs.length} />
               <Meter label="Ready or deployed" v={cs.filter(c => ["ready", "deployed"].includes(stage(c))).length} n={cs.length} />
             </div>
-            {blockers.length > 0 && <div><span className="mono-label">Blockers</span><div className="rows">{blockers.map(b => <a key={b.id} href={"#c-" + b.componentId} className="rowlink"><span className="rowlink-main"><b>{b.title}</b><small>{b.nextAction}</small></span><span className="tnum t-crit-text" style={{ fontSize: 12.5 }}>{fmtDate(b.target)}</span></a>)}</div></div>}
+            {blockers.length > 0 && <div><span className="mono-label">Blockers</span><div className="rows">{blockers.map(b => <a key={b.id} href={"#c-" + b.componentId} className="rowlink"><span className="rowlink-main"><b>{b.title}</b><small>{b.nextAction}</small></span><span className="tnum t-crit-text" style={{ fontSize: 12 }}>{fmtDate(b.target)}</span></a>)}</div></div>}
           </div>
         </div>
       </section>
@@ -291,7 +291,7 @@ export function Projects() {
                 <span className="rowlink-main"><b className="mono">{r.name}</b><small>{r.description}</small></span>
                 <span className="hide-sm muted" style={{ fontSize: 13 }}>{proj || "—"}</span>
                 <span className={cx("ci", "ci-" + (r.access === "connected" ? r.ci : "warn"))}>{r.access === "connected" ? label(r.ci) : r.access === "pending_install" ? "Install pending" : "No access"}</span>
-                <span className="muted tnum" style={{ fontSize: 12.5, textAlign: "right" }}>{r.github.commits[0] ? ago(r.github.commits[0].at) : "—"}</span>
+                <span className="muted tnum" style={{ fontSize: 12, textAlign: "right" }}>{r.github.commits[0] ? ago(r.github.commits[0].at) : "—"}</span>
               </button>
             );
           })}

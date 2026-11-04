@@ -1,0 +1,123 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style></head>
+<body><canvas id="c" width="3840" height="2160"></canvas>
+<script>
+// Deterministic intro film: render(t) draws frame at time t (seconds). Text is overlaid in HTML at runtime.
+const W = 3840, H = 2160, cx = W / 2, cy = H * 0.43;
+const c = document.getElementById('c'), g = c.getContext('2d');
+const logo = new Image(); logo.src = 'logo2x.png';
+const LH = 600, LW = LH * 834 / 744;
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const eo = x => 1 - Math.pow(1 - clamp(x), 3);
+const eio = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const dust = Array.from({ length: 170 }, () => ({ x: rnd() * W, y: rnd() * H, z: .3 + rnd() * .7, r: 1.5 + rnd() * 3.5, a: .08 + rnd() * .25, ph: rnd() * 6.28 }));
+const sparks = Array.from({ length: 46 }, (_, i) => ({ t0: .95 + rnd() * 1.9, ang: -1.25 + rnd() * 1.1, sp: 110 + rnd() * 260, r: 3 + rnd() * 10, curl: (rnd() - .5) * 1.4, life: 1.1 + rnd() * 1.3, hue: rnd() }));
+const off = document.createElement('canvas'); off.width = 1400; off.height = 1300; const o = off.getContext('2d');
+const noise = document.createElement('canvas'); noise.width = 512; noise.height = 512; const n = noise.getContext('2d');
+function makeNoise(s) { const d = n.createImageData(512, 512); let q = s * 9973 + 1; for (let i = 0; i < d.data.length; i += 4) { q = (q * 16807) % 2147483647; const v = q % 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } n.putImageData(d, 0, 0); }
+
+function render(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.filter = 'none';
+  g.fillStyle = '#020604'; g.fillRect(0, 0, W, H);
+  // ambient field
+  const amb = eo(t / .9);
+  let rg = g.createRadialGradient(cx, cy, 0, cx, cy, W * .7);
+  rg.addColorStop(0, `rgba(14,58,39,${.9 * amb})`); rg.addColorStop(.38, `rgba(7,28,20,${.9 * amb})`); rg.addColorStop(1, 'rgba(2,6,4,1)');
+  g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  // volumetric rays
+  g.save(); g.globalCompositeOperation = 'lighter'; g.translate(cx, cy);
+  const ra = eo((t - .15) / 1.2) * (1 - .25 * eo((t - 2.4) / 1));
+  for (let i = 0; i < 9; i++) {
+    const ang = -Math.PI / 2 + (i - 4) * .33 + Math.sin(t * .35 + i) * .04 + t * .025;
+    g.save(); g.rotate(ang);
+    const len = H * 1.25, wid = 120 + (i % 3) * 90;
+    const lg = g.createLinearGradient(0, 0, len, 0);
+    lg.addColorStop(0, `rgba(140,230,90,${.10 * ra})`); lg.addColorStop(.35, `rgba(90,200,110,${.045 * ra})`); lg.addColorStop(1, 'rgba(60,160,90,0)');
+    g.fillStyle = lg; g.beginPath(); g.moveTo(0, -18); g.lineTo(len, -wid); g.lineTo(len, wid); g.lineTo(0, 18); g.closePath(); g.filter = 'blur(28px)'; g.fill(); g.filter = 'none';
+    g.restore();
+  }
+  g.restore();
+  // dust, parallax drift
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (const p of dust) {
+    const y = (p.y - t * 38 * p.z + H) % H, x = p.x + Math.sin(t * .6 + p.ph) * 14 * p.z;
+    const dd = Math.hypot(x - cx, y - cy) / (W * .55);
+    g.globalAlpha = p.a * amb * clamp(1.2 - dd) * (.6 + .4 * Math.sin(t * 2 + p.ph));
+    g.fillStyle = '#B8F07A'; g.beginPath(); g.arc(x, y, p.r * p.z, 0, 6.283); g.fill();
+  }
+  g.restore(); g.globalAlpha = 1;
+  // logo glow halo
+  const lp = eo((t - .3) / 1.15);
+  const halo = clamp((t - .45) / .9) * (1 - .35 * eo((t - 1.6) / 1.2));
+  rg = g.createRadialGradient(cx, cy + 40, 0, cx, cy + 40, 780);
+  rg.addColorStop(0, `rgba(117,216,45,${.30 * halo})`); rg.addColorStop(.45, `rgba(60,170,80,${.12 * halo})`); rg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalCompositeOperation = 'lighter'; g.fillStyle = rg; g.fillRect(cx - 900, cy - 900, 1800, 1800); g.globalCompositeOperation = 'source-over';
+
+  // logo with diagonal reveal (follows the swoosh direction, lower-left → upper-right)
+  const cam = 1.12 - .12 * eio(clamp((t - .15) / 2.9));
+  const lx = cx - LW / 2, ly = cy - LH / 2;
+  o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, off.width, off.height); o.globalCompositeOperation = 'source-over';
+  const ox = (off.width - LW) / 2, oy = (off.height - LH) / 2;
+  o.drawImage(logo, ox, oy, LW, LH);
+  o.globalCompositeOperation = 'destination-in';
+  const dir = [.86, -.51], span = 1650, pos = -820 + lp * span;
+  const mg = o.createLinearGradient(off.width / 2 + dir[0] * (pos - 260), off.height / 2 + dir[1] * (pos - 260), off.width / 2 + dir[0] * (pos + 60), off.height / 2 + dir[1] * (pos + 60));
+  mg.addColorStop(0, 'rgba(0,0,0,1)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
+  o.fillStyle = mg; o.fillRect(0, 0, off.width, off.height);
+  // sheen band, masked by logo
+  const sh = clamp((t - 1.15) / .8);
+  if (sh > 0 && sh < 1) {
+    o.globalCompositeOperation = 'source-atop';
+    const sp = -700 + eio(sh) * 1500;
+    const sg = o.createLinearGradient(off.width / 2 + dir[0] * (sp - 120), off.height / 2 + dir[1] * (sp - 120), off.width / 2 + dir[0] * (sp + 120), off.height / 2 + dir[1] * (sp + 120));
+    sg.addColorStop(0, 'rgba(230,255,190,0)'); sg.addColorStop(.5, 'rgba(235,255,200,.78)'); sg.addColorStop(1, 'rgba(230,255,190,0)');
+    o.fillStyle = sg; o.fillRect(0, 0, off.width, off.height);
+  }
+  g.save(); g.translate(cx, cy); g.scale(cam, cam); g.translate(-cx, -cy);
+  const blur = (1 - lp) * 22;
+  g.globalAlpha = clamp(lp * 1.6);
+  g.filter = `blur(${blur.toFixed(1)}px)`;
+  g.drawImage(off, cx - off.width / 2, cy - off.height / 2);
+  // bloom
+  g.globalCompositeOperation = 'lighter'; g.globalAlpha = .28 * lp * (1 - .4 * eo((t - 1.8) / 1)); g.filter = 'blur(46px)';
+  g.drawImage(off, cx - off.width / 2, cy - off.height / 2);
+  g.restore(); g.filter = 'none'; g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+
+  // sparks rising from the logo's particle cluster (top-right of the mark)
+  const ex = cx + (LW * .41) * cam, ey = cy - (LH * .40) * cam;
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (const s of sparks) {
+    const age = t - s.t0; if (age < 0 || age > s.life) continue;
+    const k = age / s.life;
+    const a = s.ang + s.curl * k;
+    const d = s.sp * age * (1 - .35 * k);
+    const x = ex + Math.cos(a) * d, y = ey + Math.sin(a) * d - 40 * age * age;
+    const al = Math.sin(Math.PI * Math.min(1, k * 1.2)) * .9;
+    const r = s.r * (1 - .5 * k);
+    const sg = g.createRadialGradient(x, y, 0, x, y, r * 4);
+    const col = s.hue > .5 ? '162,233,74' : '117,216,45';
+    sg.addColorStop(0, `rgba(${col},${al})`); sg.addColorStop(.25, `rgba(${col},${al * .5})`); sg.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = sg; g.beginPath(); g.arc(x, y, r * 4, 0, 6.283); g.fill();
+  }
+  // glint on the largest dot
+  const gl = clamp((t - 1.5) / .25) * (1 - clamp((t - 1.75) / .7));
+  if (gl > 0) {
+    const gx = cx + LW * .45 * cam, gy = cy - LH * .44 * cam;
+    let rr = g.createRadialGradient(gx, gy, 0, gx, gy, 140); rr.addColorStop(0, `rgba(240,255,210,${.9 * gl})`); rr.addColorStop(1, 'rgba(162,233,74,0)');
+    g.fillStyle = rr; g.beginPath(); g.arc(gx, gy, 140, 0, 6.283); g.fill();
+    for (const [w, h] of [[520, 5], [5, 300]]) { const lg = g.createRadialGradient(gx, gy, 0, gx, gy, Math.max(w, h) / 2); lg.addColorStop(0, `rgba(235,255,200,${.8 * gl})`); lg.addColorStop(1, 'rgba(235,255,200,0)'); g.fillStyle = lg; g.fillRect(gx - w / 2, gy - h / 2, w, h); }
+  }
+  g.restore();
+  // vignette
+  rg = g.createRadialGradient(cx, cy, H * .35, cx, cy, W * .62);
+  rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(0,0,0,.55)');
+  g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  // fine grain (dither against banding)
+  makeNoise(Math.floor(t * 30)); g.globalAlpha = .035; g.globalCompositeOperation = 'overlay';
+  const pat = g.createPattern(noise, 'repeat'); g.fillStyle = pat; g.fillRect(0, 0, W, H);
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+}
+window.ready = new Promise(r => logo.onload = r);
+window.render = render;
+</script></body></html>

@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+preview/
+.vite/
+
+# local tooling caches — vendored skill packages, not source
+.claude/
+.impeccable/
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.log

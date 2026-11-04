@@ -1,0 +1,117 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#0B0C0B;overflow:hidden}canvas{display:block}</style></head>
+<body><canvas id="c" width="3840" height="2160"></canvas>
+<script>
+/*
+  Apex intro — one stripe.
+
+  A single light stripe crosses the frame. Everything it has passed is drawn;
+  everything ahead of it is not. By the time the stripe leaves the frame the
+  mark is complete. No rays, no halo, no bloom, no sparks, no lens flare.
+  render(t) is deterministic so frames can be piped straight to ffmpeg.
+*/
+const W = 3840, H = 2160, cx = W / 2, cy = H * 0.44;
+const c = document.getElementById('c'), g = c.getContext('2d');
+const logo = new Image(); logo.src = 'logo2x.png';
+const LH = 620, LW = LH * 834 / 744;
+
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const eo   = x => 1 - Math.pow(1 - clamp(x), 3);            // ease-out
+const eio  = x => { x = clamp(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x+2, 3)/2; };
+
+// Travel direction of the stripe: left to right, tilted to sit with the mark's swoosh.
+const A = -7 * Math.PI / 180;
+const ux = Math.cos(A), uy = Math.sin(A);     // along travel
+const px = -uy,         py =  ux;             // along the stripe itself
+
+const off = document.createElement('canvas'); off.width = 1500; off.height = 1400;
+const o = off.getContext('2d');
+const noise = document.createElement('canvas'); noise.width = 512; noise.height = 512;
+const n = noise.getContext('2d');
+function makeNoise(s) {
+  const d = n.createImageData(512, 512); let q = s * 9973 + 1;
+  for (let i = 0; i < d.data.length; i += 4) { q = (q * 16807) % 2147483647; const v = q % 255; d.data[i] = d.data[i+1] = d.data[i+2] = v; d.data[i+3] = 255; }
+  n.putImageData(d, 0, 0);
+}
+
+const SPAN = W * 0.62;                         // distance the stripe travels, from centre
+/*
+  Fast at the edges, slow across the middle — the opposite of a normal ease.
+  The mark occupies only ~15% of the travel, so an ordinary ease-in-out blows
+  through the one part worth watching. This holds the stripe over the mark.
+*/
+function stripePos(t) {
+  const s = clamp((t - 0.15) / 1.30);
+  const k = 2 * s - 1;
+  const f = 0.5 + 0.5 * (0.78 * k * k * k + 0.22 * k);
+  return -SPAN + f * SPAN * 2;
+}
+
+function render(t) {
+  g.setTransform(1,0,0,1,0,0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.filter = 'none';
+
+  // flat ground, the same one the app uses
+  g.fillStyle = '#0B0C0B'; g.fillRect(0, 0, W, H);
+
+  const p = stripePos(t);
+  const gone = clamp((t - 1.34) / 0.34);       // stripe fading as it leaves
+  const settle = eio(clamp((t - 0.15) / 1.8));
+
+  // ── the mark, drawn only where the stripe has already passed ──────────────
+  o.setTransform(1,0,0,1,0,0); o.clearRect(0, 0, off.width, off.height);
+  o.globalCompositeOperation = 'source-over';
+  o.drawImage(logo, (off.width - LW) / 2, (off.height - LH) / 2, LW, LH);
+  o.globalCompositeOperation = 'destination-in';
+  const ocx = off.width / 2, ocy = off.height / 2, soft = 34;
+  const mg = o.createLinearGradient(
+    ocx + ux * (p - soft), ocy + uy * (p - soft),
+    ocx + ux * (p + soft), ocy + uy * (p + soft));
+  mg.addColorStop(0, 'rgba(0,0,0,1)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
+  o.fillStyle = mg; o.fillRect(0, 0, off.width, off.height);
+
+  const cam = 1.04 - 0.04 * settle;
+  g.save();
+  g.translate(cx, cy); g.scale(cam, cam); g.translate(-cx, -cy);
+  g.drawImage(off, cx - off.width / 2, cy - off.height / 2);
+  g.restore();
+
+  // ── the stripe ────────────────────────────────────────────────────────────
+  if (gone < 1) {
+    const a = (1 - gone) * clamp(t / 0.18);
+    const sx = cx + ux * p, sy = cy + uy * p;
+    const half = H * 0.95;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+
+    // soft shoulder, kept narrow and dim so it reads as an edge, not a glare
+    const shoulder = 46;
+    const sg = g.createLinearGradient(sx - ux * shoulder, sy - uy * shoulder, sx + ux * shoulder, sy + uy * shoulder);
+    sg.addColorStop(0,   'rgba(69,193,128,0)');
+    sg.addColorStop(0.5, `rgba(69,193,128,${0.26 * a})`);
+    sg.addColorStop(1,   'rgba(69,193,128,0)');
+    g.fillStyle = sg;
+    g.beginPath();
+    g.moveTo(sx + px * half - ux * shoulder, sy + py * half - uy * shoulder);
+    g.lineTo(sx - px * half - ux * shoulder, sy - py * half - uy * shoulder);
+    g.lineTo(sx - px * half + ux * shoulder, sy - py * half + uy * shoulder);
+    g.lineTo(sx + px * half + ux * shoulder, sy + py * half + uy * shoulder);
+    g.closePath(); g.fill();
+
+    // the line itself
+    g.strokeStyle = `rgba(228,244,234,${0.92 * a})`;
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(sx + px * half, sy + py * half);
+    g.lineTo(sx - px * half, sy - py * half);
+    g.stroke();
+    g.restore();
+  }
+
+  // fine grain, to keep the flat ground from banding
+  makeNoise(Math.floor(t * 60)); g.globalAlpha = .022; g.globalCompositeOperation = 'overlay';
+  g.fillStyle = g.createPattern(noise, 'repeat'); g.fillRect(0, 0, W, H);
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+}
+window.ready = new Promise(r => logo.onload = r);
+window.render = render;
+</script></body></html>

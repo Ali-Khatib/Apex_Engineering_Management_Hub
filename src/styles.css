@@ -1938,3 +1938,31 @@ button.li3:hover, button.li:hover { background: var(--surface-2); }
   .wrow-next { grid-column: 2 / -1; }
   .wrow-detail { padding-left: 18px; }
 }
+
+/* ───────── Settings ───────── */
+.set-id { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.set-id > div { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.set-id b { font-size: 16px; font-weight: 600; color: var(--fg); }
+.set-id small { font-size: 12.5px; color: var(--fg-3); }
+.set-form { display: grid; gap: 14px; }
+.set-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--fg-3); max-width: 84ch; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 15px 0; border-bottom: 1px solid var(--line); }
+.set-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.set-row:first-child { padding-top: 0; }
+.set-row > div { display: grid; gap: 3px; min-width: 0; }
+.set-row b { font-size: 14px; font-weight: 500; color: var(--fg); }
+.set-row small { font-size: 12.5px; line-height: 1.55; color: var(--fg-3); max-width: 76ch; }
+.set-list { display: grid; }
+.set-check { display: flex; align-items: flex-start; gap: 12px; padding: 13px 24px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background-color var(--t-ui) var(--ease); }
+.set-check:hover { background: var(--surface-2); }
+.set-check input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--brand); flex: none; }
+.set-check span { display: grid; gap: 2px; min-width: 0; }
+.set-check b { font-size: 13.5px; font-weight: 500; color: var(--fg); }
+.set-check small { font-size: 12.5px; line-height: 1.5; color: var(--fg-3); }
+.set-can { list-style: none; margin: 0; padding: 4px 24px 16px; display: grid; gap: 9px; }
+.set-can li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--fg-2); }
+.set-can li svg { flex: none; color: var(--ok); }
+.set-can li.no { color: var(--fg-4); }
+.set-can li.no svg { color: var(--fg-4); }
+.set-can em { font-style: normal; margin-left: auto; font-size: 11.5px; color: var(--fg-4); }
+@media (max-width: 720px) { .set-row { flex-direction: column; align-items: stretch; gap: 10px; } }

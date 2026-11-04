@@ -54,6 +54,8 @@ function useProvideStore() {
     d.history.unshift({ id: uid("h"), at: nowIso(), by: e.by || d.me || "system", source: "apex", ...e } as HistoryEntry);
   const notify = (d: AppState, to: string | null | undefined, kind: Notice["kind"], title: string, body: string, componentId?: string) => {
     if (!to || to === d.me) return;
+    // Preferences are real: an unticked kind is never delivered.
+    if (d.people.find(p => p.id === to)?.prefs?.[kind] === false) return;
     d.notices.unshift({ id: uid("n"), to, kind, title, body, componentId, at: nowIso(), read: false });
   };
   const comp = (d: AppState, id: string) => d.components.find(c => c.id === id)!;

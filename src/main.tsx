@@ -17,6 +17,7 @@ import { About } from "./pages/about";
 import { Team } from "./pages/team";
 import { MyWork } from "./pages/mywork";
 import { Repos } from "./pages/repos";
+import { Settings } from "./pages/settings";
 
 class Boundary extends React.Component<{ children: React.ReactNode; resetKey: string }, { err: Error | null }> {
   state = { err: null as Error | null };
@@ -41,6 +42,7 @@ function Route() {
     case "blockers": return <Blockers />;
     case "mywork": return <MyWork />;
     case "repos": return <Repos />;
+    case "settings": return <Settings />;
     case "practices": return <Practices />;
     case "about": return <About />;
     case "team": return <Team />;

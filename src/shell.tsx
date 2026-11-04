@@ -19,14 +19,18 @@ export function Intro({ onDone }: { onDone: () => void }) {
   const [playing, setPlaying] = useState(false);
   const done = useRef(false);
   const reduced = useMemo(() => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
-  const src = useMemo(() => (Math.max(screen.width, screen.height) * (devicePixelRatio || 1) >= 2400 ? "intro-4k.mp4" : "intro-1080.mp4"), []);
+  const src = useMemo(() => (Math.max(screen.width, screen.height) * (devicePixelRatio || 1) >= 3000 ? "intro-4k.mp4" : "intro-1080.mp4"), []);
   const finish = () => { if (done.current) return; done.current = true; setOut(true); setTimeout(onDone, 360); };
   useEffect(() => {
     if (reduced) { const t = setTimeout(finish, 900); return () => clearTimeout(t); }
-    const slow = setTimeout(() => { if (!playing) setMode("css"); }, 1600);
-    const cap = setTimeout(finish, 5200);
+    // Give the file a real chance to arrive. The old 1600ms race abandoned the
+    // video on any cold CDN fetch, which is every first visit in production.
+    // Once it is playing, no fallback timer runs at all.
+    if (playing) { const cap = setTimeout(finish, 6000); return () => clearTimeout(cap); }
+    const slow = setTimeout(() => setMode(m => (m === "video" ? "css" : m)), 5000);
+    const cap = setTimeout(finish, 9000);
     return () => { clearTimeout(slow); clearTimeout(cap); };
-  }, [playing]);
+  }, [playing, reduced]);
   useEffect(() => { if (mode === "css") { const t = setTimeout(finish, 2200); return () => clearTimeout(t); } }, [mode]);
   const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
     const a = (-70 + i * 9) * Math.PI / 180, d = 40 + (i * 37) % 70;
@@ -37,7 +41,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
       {mode === "video" && !reduced ? (
         <>
           <video className={cx("intro-video", playing && "on")} src={src} muted playsInline autoPlay preload="auto"
-            onPlaying={() => setPlaying(true)} onEnded={finish} onError={() => setMode("css")} />
+            onCanPlay={() => setPlaying(true)} onPlaying={() => setPlaying(true)} onEnded={finish} onError={() => setMode("css")} />
           <div className={cx("intro-title", playing && "go")}><strong>Apex AI Arabia</strong><span>Engineering Platform</span></div>
         </>
       ) : (
@@ -150,6 +154,9 @@ export const NAV = [
 ];
 export const routeBase = (r: string) => r.startsWith("c-") ? "library" : r.startsWith("m-") ? "modules" : r.startsWith("p-") ? "practices" : r === "" || r === "overview" ? "home" : r;
 
+/** Pages reachable outside the sidebar, so the breadcrumb can still name them. */
+export const OFF_NAV: Record<string, string> = { settings: "Settings" };
+
 const NOTICE_ICON: Record<Notice["kind"], string> = { assignment: "mywork", review: "readiness", blocker: "blockers", deadline: "clock", handoff: "handoff", comment: "message" };
 
 export function Rail({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
@@ -194,7 +201,7 @@ export function Topbar({ onSearch, onMenu }: { onSearch: () => void; onMenu: () 
   return (
     <header className="bar">
       <button className="bar-icon bar-menu" onClick={onMenu} aria-label="Open menu"><Icon name="menu" size={18} /></button>
-      <nav className="bar-crumb" aria-label="Breadcrumb">{leaf ? <><a href={"#" + base}>{section?.label}</a><Icon name="chevronRight" size={12} /><b>{leaf}</b></> : <b>{section?.label || "Overview"}</b>}</nav>
+      <nav className="bar-crumb" aria-label="Breadcrumb">{leaf ? <><a href={"#" + base}>{section?.label}</a><Icon name="chevronRight" size={12} /><b>{leaf}</b></> : <b>{section?.label || OFF_NAV[base] || "Overview"}</b>}</nav>
       <button className="bar-search" onClick={onSearch}><Icon name="search" size={15} /><span>Search components, modules, people…</span><kbd>Ctrl K</kbd></button>
       <ThemeSwitch />
       <Menu trigger={(o, t) => <button className="bar-icon" onClick={t} aria-label={`Notifications, ${unread} unread`} aria-expanded={o}><Icon name="activity" size={18} />{unread > 0 && <span className="bar-dot" />}</button>}>
@@ -216,6 +223,7 @@ export function Topbar({ onSearch, onMenu }: { onSearch: () => void; onMenu: () 
         {close => <>
           <div style={{ padding: "8px 10px 10px", display: "flex", gap: 10, alignItems: "center" }}><Avatar p={me} size={34} /><div style={{ minWidth: 0 }}><b style={{ display: "block" }}>{personName(me)}</b><small className="muted">{me?.title} · {isAdmin ? "Admin" : "Member"}</small></div></div>
           <div className="menu-sep" />
+          <MenuItem icon="settings" onClick={() => { close(); go("settings"); }}>Settings</MenuItem>
           <MenuItem icon="mywork" onClick={() => { close(); signOut(); }}>Switch account</MenuItem>
           <MenuItem icon="refresh" onClick={() => { close(); resetDemo(); toast("Data reset to the starting state"); }}>Reset data</MenuItem>
           <MenuItem icon="logout" onClick={() => { close(); signOut(); }}>Sign out</MenuItem>

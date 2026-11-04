@@ -11,9 +11,14 @@ export type ReviewState = "none" | "ready" | "in_review" | "changes_requested" |
 export type CritStatus = "not_started" | "in_progress" | "submitted" | "accepted" | "rejected" | "changes_requested";
 export type LinkKind = "github" | "erpnext" | "slack" | "drive" | "sheets";
 
+export interface NotifyPrefs { assignment: boolean; review: boolean; blocker: boolean; deadline: boolean; handoff: boolean; comment: boolean; }
+export const DEFAULT_NOTIFY: NotifyPrefs = { assignment: true, review: true, blocker: true, deadline: true, handoff: true, comment: true };
+
 export interface Person {
   id: string; first: string; last: string; email: string; role: Role;
   title: string; team: string; skills: string[]; hue: number; joined: string; active: boolean;
+  /** Which notifications this person wants. Absent means all of them. */
+  prefs?: Partial<NotifyPrefs>;
 }
 export interface Project {
   id: string; code: string; name: string; client: string; sector: string; summary: string; leadId: string;

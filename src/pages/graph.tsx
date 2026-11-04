@@ -89,6 +89,17 @@ export function Graph() {
 
       {/* The statistics are context for the decisions, not the point of the
           page, so they are one sentence rather than three metric cards. */}
+      {loops[0] && (
+        <div className="dr-example">
+          <h2>What a loop is</h2>
+          <p>
+            <b>{component(loops[0].ids[0])?.name}</b> cannot be finished until <b>{component(loops[0].ids[1] || loops[0].ids[0])?.name}</b> is done.
+            But <b>{component(loops[0].ids[1] || loops[0].ids[0])?.name}</b> cannot be finished until <b>{component(loops[0].ids[0])?.name}</b> is done.
+            So neither can go first, and no amount of scheduling fixes it. A person has to decide which of the two needs the other less.
+          </p>
+        </div>
+      )}
+
       <p className="dr-context">
         Every one of the {cs.length} components names at least one prerequisite, and {inLoop.size} are caught in a loop.
         Until the loops are decided there is no valid build order for the library as a whole.

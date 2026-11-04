@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useStore, useNav } from "../store";
 import { Icon } from "../icons";
-import { Markdown, Section, PersonChip, cx, OwnerState, LifecyclePill } from "../ui";
+import { Markdown, Section, Empty, cx, LifecyclePill } from "../ui";
 import { WAVES } from "../seed";
-import { LayerOfTag } from "./lib";
-import { lifecycle, lifecycleCounts, LIFECYCLE, type Lifecycle } from "../logic";
+import { lifecycle, lifecycleCounts, LIFECYCLE, situation, type Lifecycle } from "../logic";
 
 /**
  * Two independent axes, shown as two independent filters.
@@ -21,6 +20,7 @@ export function Roadmap() {
   const { go } = useNav();
   const [wave, setWave] = useState<string>("");
   const [life, setLife] = useState<Lifecycle | "">("");
+  const [shown, setShown] = useState(30);
 
   const all = state.components;
   const waveCounts = useMemo(() => Object.fromEntries(WAVES.map(w => [w.id, all.filter(c => c.lib?.wave === w.id).length])), [all]);
@@ -42,18 +42,23 @@ export function Roadmap() {
         <p className="lede"><b>Lifecycle</b> is how far the work has actually got. <b>Planning wave</b> is where the component map of 20 October put it. Neither decides the other, so you can filter by both.</p>
       </header>
 
-      {/* Lifecycle leads, because "what is actually happening" is the question
-          people open this page with. The planning wave stays a full dimension
-          but sits in a select, so the page is one row of filters, not two. */}
-      <div className="rm-bar">
-        <div className="axis-row" role="group" aria-label="Filter by lifecycle">
-          <button className={cx("axis-chip", !life && "on")} onClick={() => setLife("")}>All<b>{all.length}</b></button>
-          {LIFECYCLE.map(l => (
-            <button key={l.id} className={cx("axis-chip", "lc-" + l.tone, life === l.id && "on")} onClick={() => setLife(life === l.id ? "" : l.id)} title={l.help} aria-pressed={life === l.id}>
-              <i aria-hidden />{l.label}<b>{lifeCounts[l.id]}</b>
+      {/* The seven states are a sequence, so the page shows them as one.
+          Reading top to bottom is the explanation; no legend required. */}
+      <ol className="rm-track" aria-label="Where the library stands">
+        {LIFECYCLE.map(l => (
+          <li key={l.id}>
+            <button className={cx("rm-step", "lc-" + l.tone, life === l.id && "on")} onClick={() => setLife(life === l.id ? "" : l.id)} aria-pressed={life === l.id}>
+              <strong>{lifeCounts[l.id]}</strong>
+              <span>{l.label}</span>
             </button>
-          ))}
-        </div>
+          </li>
+        ))}
+      </ol>
+
+      <div className="rm-bar">
+        <p className="rm-help">
+          {life ? LIFECYCLE.find(l => l.id === life)!.help : "Select a stage to see only those components. Each one also carries the planning wave it came from, which is a separate question."}
+        </p>
         <div className="rm-wave">
           <label htmlFor="rm-wave">Planning wave</label>
           <select id="rm-wave" value={wave} onChange={e => setWave(e.target.value)}>
@@ -63,8 +68,6 @@ export function Roadmap() {
         </div>
       </div>
 
-      {life && <p className="rm-help">{LIFECYCLE.find(l => l.id === life)!.help}</p>}
-
       {lifeCounts.ready === 0 && lifeCounts.assigned === 0 && !life && !wave && (
         <p className="axis-note">
           <Icon name="alert" size={14} />
@@ -73,7 +76,7 @@ export function Roadmap() {
       )}
 
       <div className="axis-sum">
-        <span><b>{list.length}</b> component{list.length === 1 ? "" : "s"}{filtered ? " match" : ""}
+        <span><b>{list.length}</b> component{list.length === 1 ? "" : "s"}{filtered ? " shown" : ""}
           {wave && <> · wave <em>{WAVES.find(w => w.id === wave)!.label}</em></>}
         </span>
         <span className="axis-sum-right">
@@ -84,20 +87,26 @@ export function Roadmap() {
       </div>
 
       {list.length === 0 ? (
-        <div className="empty"><strong>Nothing matches both filters</strong><p>No component is in that lifecycle state and that planning wave at the same time. That combination may simply not exist.</p><button className="btn btn-secondary btn-md" onClick={() => { setWave(""); setLife(""); }}>Clear filters</button></div>
+        <Empty icon="plan" title="Nothing matches both filters">No component is in that stage and that planning wave at once. That combination may simply not exist.</Empty>
       ) : (
-        <div className="rgrid">
-          {list.map(c => (
-            <a key={c.id} href={"#c-" + c.id} className={cx("rcard", !c.ownerId && c.status !== "completed" && "no-owner")}>
-              <span className="rcard-top"><code className="cid">{c.id}</code><LifecyclePill c={c} /></span>
-              <b>{c.name}</b>
-              <p>{c.summary}</p>
-              <span className="rcard-foot">
-                <span className="rcard-wave" title="Planning wave, from the source sheet">{c.lib?.wave || "No wave"}</span>
-                <OwnerState c={c} size={20} />
+        <div className="rlist">
+          {list.slice(0, shown).map(c => (
+            <a key={c.id} href={"#c-" + c.id} className={cx("ritem", !c.ownerId && c.status !== "completed" && "no-owner")}>
+              <span className="ritem-head">
+                <code className="cid">{c.id}</code>
+                <b>{c.name}</b>
+                <LifecyclePill c={c} />
+                <span className="ritem-wave" title="Planning wave, from the source sheet">{c.lib?.wave || "No wave"}</span>
               </span>
+              <span className="ritem-sit">{situation(state, c)}</span>
+              <span className="ritem-sum">{c.summary}</span>
             </a>
           ))}
+        </div>
+      )}
+      {shown < list.length && (
+        <div style={{ paddingTop: 14 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShown(n => n + 30)}>Show more ({list.length - shown} left)</button>
         </div>
       )}
 

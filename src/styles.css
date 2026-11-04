@@ -2532,3 +2532,45 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 .dr-head span { font-size: 12.5px; color: var(--fg-3); }
 .dr-list { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
 .dr-list .cyc:last-child { border-bottom: 0; }
+
+/* ───────── Roadmap: the lifecycle as a sequence you can read ─────────
+   Seven stages left to right. Reading them in order is the explanation, so
+   no legend is needed and no chip has to be hovered. */
+.rm-track { list-style: none; display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 20px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
+.rm-track li { flex: 1 1 130px; min-width: 0; }
+.rm-step { display: grid; gap: 1px; width: 100%; height: 100%; padding: 13px 14px 14px; border: 0; border-left: 1px solid var(--line); background: none; text-align: left; transition: background-color var(--t-ui) var(--ease); }
+.rm-track li:first-child .rm-step { border-left: 0; }
+.rm-step:hover { background: var(--surface-2); }
+.rm-step strong { font-size: 22px; font-weight: 500; line-height: 1.15; letter-spacing: -.02em; color: var(--fg); font-variant-numeric: tabular-nums; }
+.rm-step span { font-size: 12px; line-height: 1.35; color: var(--fg-3); }
+.rm-step.on { background: var(--brand-wash); box-shadow: inset 0 -3px 0 var(--brand); }
+.rm-step.on strong, .rm-step.on span { color: var(--brand-ink); }
+.rm-step.lc-warn strong { color: var(--warn); }
+.rm-step.lc-crit strong { color: var(--crit); }
+.rm-step.lc-review strong { color: var(--review); }
+.rm-step.lc-ok strong { color: var(--ok); }
+.rm-step.on strong { color: var(--brand-ink); }
+
+.rm-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin: 0 0 18px; }
+.rm-help { margin: 0; flex: 1 1 420px; font-size: 13.5px; line-height: 1.6; color: var(--fg-3); max-width: 80ch; }
+
+/* One component, one paragraph. The situation sentence is the point of the
+   row; the specification line is support. */
+.rlist { display: grid; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
+.ritem { display: grid; gap: 5px; padding: 15px 20px 16px; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; color: var(--fg-2); }
+.ritem:last-child { border-bottom: 0; }
+.ritem:hover { background: var(--surface-2); text-decoration: none; }
+.ritem.no-owner { border-left-color: var(--warn); }
+.ritem-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.ritem-head b { font-size: 15px; font-weight: 500; color: var(--fg); min-width: 0; }
+.ritem:hover .ritem-head b { color: var(--brand-ink); }
+.ritem-wave { font-size: 11.5px; padding: 2px 8px; border-radius: var(--r-pill); border: 1px dashed var(--line-strong); color: var(--fg-4); white-space: nowrap; }
+.ritem-sit { font-size: 14px; line-height: 1.6; color: var(--fg); max-width: 92ch; }
+.ritem-sum { font-size: 13px; line-height: 1.55; color: var(--fg-4); max-width: 92ch; }
+@media (max-width: 620px) { .rm-track li { flex: 1 1 50%; } .rm-step { border-top: 1px solid var(--line); } }
+
+/* Dependencies: show the reader one real loop before any numbers. */
+.dr-example { margin: 0 0 20px; padding: 16px 20px 18px; border-left: 3px solid var(--warn); border-radius: 0 var(--r) var(--r) 0; background: var(--warn-bg); }
+.dr-example h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--warn); }
+.dr-example p { margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--fg); max-width: 88ch; }
+.dr-example b { font-weight: 600; }

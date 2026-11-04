@@ -275,3 +275,59 @@ export function lifecycleCounts(s: AppState, cs: Component[]) {
 export const CHECK_LABEL: Record<string, string> = {
   passed: "passed", failed: "failing", running: "running", pending: "pending", skipped: "skipped", unknown: "not run",
 };
+
+/**
+ * One plain sentence saying where a component actually stands, built from its
+ * own records: owner, wave, dependencies, blockers, gates and dates. Every
+ * clause is a fact already on the record. Nothing is written in advance and
+ * nothing is invented, so a component with thin data gets a short sentence
+ * rather than a padded one.
+ */
+export function situation(s: AppState, c: Component): string {
+  const who = (id?: string | null) => personName(s.people.find(p => p.id === id)) || "someone";
+  const ob = openBlockers(s, c.id);
+  const pending = c.deps.map(id => s.components.find(x => x.id === id)).filter(d => d && !isDone(d)) as Component[];
+  const due = c.due ? ` Due ${fmtDate(c.due)}.` : "";
+  const dl = c.due ? daysUntil(c.due) : null;
+  const late = dl !== null && dl < 0 ? ` Past its date by ${-dl} ${-dl === 1 ? "day" : "days"}.` : "";
+
+  if (isDone(c)) return `Shipped. QA accepted it on the exact build and deployment was approved.`;
+
+  if (ob.length) {
+    const b = ob[0];
+    return `Stopped: ${b.title.toLowerCase()}. ${who(b.responsibleId)} is clearing it by ${fmtDate(b.target)}.`;
+  }
+  if (c.gates.qa.state === "accepted") return `${who(c.ownerId)} finished it and QA accepted it. It is waiting on a deployment decision.`;
+  if (c.gates.qa.state === "changes_requested" || c.gates.qa.state === "rejected") return `QA sent it back to ${who(c.ownerId)}.${due}`;
+  if (c.review === "changes_requested") return `${who(c.reviewerId)} asked for changes. Back with ${who(c.ownerId)}.${due}`;
+  if (c.gates.qa.state === "awaiting" || c.gates.qa.state === "in_progress") return `${who(c.ownerId)} submitted it. ${who(c.qaId)} has the QA decision.`;
+  if (c.review === "in_review") return `${who(c.ownerId)} submitted it for review. ${who(c.reviewerId)} has it.`;
+  if (c.gates.checks.state === "failed") return `${who(c.ownerId)} is building it, but the automated checks are failing.${late}`;
+
+  if (c.status === "in_progress") return `${who(c.ownerId)} is building it.${due}${late}`;
+
+  if (c.ownerId && pending.length) {
+    const names = pending.slice(0, 2).map(d => d.name).join(" and ");
+    return `${who(c.ownerId)} owns it, but it cannot start until ${names}${pending.length > 2 ? ` and ${pending.length - 2} more` : ""} ${pending.length === 1 ? "is" : "are"} done.`;
+  }
+  if (c.ownerId) return `${who(c.ownerId)} owns it and every prerequisite is finished. It can start now.${due}`;
+
+  // Unowned components otherwise read identically, so each one states the
+  // facts that actually differ: who is waiting on it, what it must reuse, and
+  // what it is itself waiting for.
+  const dependents = s.components.filter(x => x.deps.includes(c.id)).length;
+  const holdsUp = dependents === 0 ? "" : dependents === 1
+    ? ` One other component is waiting on it.`
+    : ` ${dependents} other components are waiting on it.`;
+  const needs = pending.length === 0 ? "" : pending.length === 1
+    ? ` It also needs ${pending[0].name} first.`
+    : ` It also needs ${pending.length} other components first.`;
+  const reuse = c.lib?.sps.length ? ` Meant to extend ${c.lib.sps.slice(0, 2).join(" and ")}.` : " No platform module is mapped to it, so it would be built from scratch.";
+
+  const w = c.lib?.wave || "";
+  if (DECISION_WAVES.includes(w)) return `Nobody can be put on it until architecture review agrees the approach.${holdsUp}${reuse}`;
+  if (SELECTED_WAVES.includes(w)) return `Chosen for this round and still unclaimed.${holdsUp}${needs}`;
+  if (w === "Not selected") return `Overlaps another entry in the library, so it is not worth planning until the two are reconciled.${holdsUp}`;
+  if (w === "Later") return `Specified and parked, with no round scheduled.${holdsUp}`;
+  return `Specified, but not picked for a round.${holdsUp}${reuse}`;
+}

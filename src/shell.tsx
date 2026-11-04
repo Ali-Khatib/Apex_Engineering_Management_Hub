@@ -147,6 +147,7 @@ export const NAV = [
   ] },
   { group: "Reference", items: [
     { id: "knowledge", label: "Engineering knowledge", sub: "How Apex builds, and where it is written down", icon: "about" },
+    { id: "architecture", label: "Architecture", sub: "How the modules and components fit together", icon: "graph" },
     { id: "modules", label: "Platform modules", sub: "SP-01 to SP-20, already built and reusable", icon: "layers" },
     { id: "repos", label: "Repositories", sub: "Where each component's code lives", icon: "repo" },
     { id: "practices", label: "Best practices", sub: "How we agreed to build", icon: "practices" },

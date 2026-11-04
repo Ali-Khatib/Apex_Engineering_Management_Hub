@@ -186,8 +186,8 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
           <section className="spec">
             <header className="spec-head"><h2>Open questions &amp; measurement</h2><span>Recorded in the component map, not yet resolved</span></header>
             <div className="spec-body spec-body-flush">
-              {lib?.constraints && <div className="note note-warn"><h5>Constraints and open questions</h5><p>{lib.constraints}</p></div>}
-              {lib?.overlap && <div className="note note-info"><h5>Overlap review</h5><p>{lib.overlap}</p></div>}
+              {lib?.constraints && <div className="note note-warn"><h3>Constraints and open questions</h3><p>{lib.constraints}</p></div>}
+              {lib?.overlap && <div className="note note-info"><h3>Overlap review</h3><p>{lib.overlap}</p></div>}
               {(lib?.metric || lib?.test) && (
                 <dl className="facts facts-pad">
                   {lib?.metric && <Fact label="Measured by" wide>{lib.metric}</Fact>}

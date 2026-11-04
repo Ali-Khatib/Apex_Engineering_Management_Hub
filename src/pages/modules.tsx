@@ -142,10 +142,10 @@ function ModuleDocs({ m, cs }: { m: { id: string; name: string; description: str
 
         {(inputs.length > 0 || outputs.length > 0) && (
           <div className="docd">
-            <h5>Observed in consuming components</h5>
+            <h3>Observed in consuming components</h3>
             <p>Field names that components building on {m.id} declare. Derived from those components, not from this module. Treat as evidence towards a contract, not the contract itself.</p>
             <div className="contract-io" style={{ border: "1px solid var(--line)", borderRadius: "var(--r)" }}>
-              <div className="io"><h5>Inputs they pass</h5><ul className="io-list">{inputs.map(x => <li key={x}><code>{x}</code></li>)}</ul></div>
+              <div className="io"><h3>Inputs they pass</h3><ul className="io-list">{inputs.map(x => <li key={x}><code>{x}</code></li>)}</ul></div>
               <div className="io-arrow" aria-hidden><Icon name="arrowRight" size={16} /></div>
               <div className="io"><h5>Outputs they expect</h5><ul className="io-list">{outputs.map(x => <li key={x}><code>{x}</code></li>)}</ul></div>
             </div>

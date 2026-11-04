@@ -60,7 +60,7 @@ export function About() {
         <div className="panel-body"><div className="contacts">
           {state.contacts.map(c => { const p = person(c.personId); return (
             <div key={c.id} className="contact">
-              <div className="row-between" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}><div><h4>{c.topic}</h4><p>{c.description}</p></div>{isAdmin && <Button size="sm" variant="ghost" icon="edit" aria-label={`Edit ${c.topic}`} onClick={() => setCt(c)} />}</div>
+              <div className="row-between" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}><div><h3>{c.topic}</h3><p>{c.description}</p></div>{isAdmin && <Button size="sm" variant="ghost" icon="edit" aria-label={`Edit ${c.topic}`} onClick={() => setCt(c)} />}</div>
               <div className="row" style={{ gap: 10, flexWrap: "nowrap" }}><Avatar p={p} size={34} /><div style={{ minWidth: 0 }}><b style={{ display: "block", fontWeight: 600 }}>{personName(p)}</b><small className="muted">{p?.title}</small></div></div>
               <div className="row" style={{ gap: 6 }}>{p && <CopyText text={p.email} />}<Pill tone="neutral"><Icon name="slack" size={12} />{c.channel}</Pill></div>
             </div>

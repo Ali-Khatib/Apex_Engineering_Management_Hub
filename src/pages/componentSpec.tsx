@@ -46,12 +46,12 @@ export function Contract({ c }: { c: Component }) {
       </div>
       <div className="contract-io">
         <div className="io">
-          <h5>Takes in</h5>
+          <h3>Takes in</h3>
           {io(lib.inputs)}
         </div>
         <div className="io-arrow" aria-hidden><Icon name="arrowRight" size={18} /></div>
         <div className="io">
-          <h5>Gives back</h5>
+          <h3>Gives back</h3>
           {io(lib.outputs)}
         </div>
       </div>

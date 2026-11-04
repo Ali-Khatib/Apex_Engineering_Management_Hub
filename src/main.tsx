@@ -20,6 +20,7 @@ import { Repos } from "./pages/repos";
 import { Settings } from "./pages/settings";
 import { QA } from "./pages/qa";
 import { Knowledge } from "./pages/knowledge";
+import { Architecture } from "./pages/architecture";
 
 class Boundary extends React.Component<{ children: React.ReactNode; resetKey: string }, { err: Error | null }> {
   state = { err: null as Error | null };
@@ -47,6 +48,7 @@ function Route() {
     case "settings": return <Settings />;
     case "qa": return <QA />;
     case "knowledge": return <Knowledge />;
+    case "architecture": return <Architecture />;
     case "practices": return <Practices />;
     case "about": return <About />;
     case "team": return <Team />;

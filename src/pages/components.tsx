@@ -29,6 +29,8 @@ export function Components() {
   const { state, isAdmin } = useStore();
   const { filter: f, setFilter } = useNav();
   const [newOpen, setNewOpen] = useState(false);
+  const [more, setMore] = useState(false);
+  const narrowed = [f.category, f.sp, f.wave, f.project, f.owner].filter(Boolean).length;
   const set = (p: Partial<CompFilter>) => setFilter({ ...f, ...p });
   const list = useMemo(() => applyFilter(state, f), [state, f]);
   const own = useMemo(() => ownershipCounts(state.components, state.me), [state.components, state.me]);
@@ -54,6 +56,25 @@ export function Components() {
           ))}
         </div>
 
+        {/* On a phone the layer chips and four selects ran to about 900px
+            before the first component. They collapse behind one control there
+            and stay open at every width that has room for them. */}
+        {/* Search stays out of the fold. On a phone it is the control people
+            reach for first, and burying it behind a toggle would be the
+            opposite of adapting the layout. */}
+        <div className="fbar-row fbar-find">
+          <label className="fsearch">
+            <Icon name="search" size={14} />
+            <input type="search" placeholder="Search by name, ID or SP number" value={f.q} onChange={e => set({ q: e.target.value })} aria-label="Search the library" />
+            {f.q && <button onClick={() => set({ q: "" })} aria-label="Clear search"><Icon name="x" size={12} /></button>}
+          </label>
+          <button className="fbar-more-btn" onClick={() => setMore(v => !v)} aria-expanded={more}>
+            <Icon name="filter" size={13} />
+            {more ? "Hide filters" : "More filters"}{narrowed > 0 && <b>{narrowed}</b>}
+          </button>
+        </div>
+
+        <div className={cx("fbar-more", more && "open")}>
         <div className="fbar-att fbar-layers" role="group" aria-label="Platform layer">
           {LAYER_ORDER.map(k => {
             const n = state.components.filter(c => c.lib?.layer === k).length; if (!n) return null;
@@ -63,11 +84,6 @@ export function Components() {
         </div>
 
         <div className="fbar-row">
-          <label className="fsearch">
-            <Icon name="search" size={14} />
-            <input type="search" placeholder="Search by name, ID or SP number" value={f.q} onChange={e => set({ q: e.target.value })} aria-label="Search the library" />
-            {f.q && <button onClick={() => set({ q: "" })} aria-label="Clear search"><Icon name="x" size={12} /></button>}
-          </label>
           <label className="fsel"><span>Platform module</span>
             <select value={f.sp} onChange={e => set({ sp: e.target.value })}><option value="">Any module</option>{state.modules.map(m => <option key={m.id} value={m.id}>{m.id} · {m.name}</option>)}</select>
           </label>
@@ -81,6 +97,7 @@ export function Components() {
             <select value={f.owner} onChange={e => set({ owner: e.target.value })}><option value="">Anyone</option><option value="__none">No owner yet</option>{state.people.map(p => <option key={p.id} value={p.id}>{personName(p)}</option>)}</select>
           </label>
           {active && <button className="fclear" onClick={() => setFilter(EMPTY_FILTER)}>Clear filters</button>}
+        </div>
         </div>
 
         <p className="fbar-sum">

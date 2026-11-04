@@ -2959,3 +2959,21 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
    crowding the ownership row it would otherwise wrap into. */
 .fbar-layers { padding-top: 1px; }
 .fbar-layers .fchip { font-size: 12px; height: 29px; padding: 0 11px; }
+/* Filters adapt rather than shrink. At desktop widths nothing is hidden and
+   the toggle does not exist; on a phone the secondary filters fold away so the
+   first component is reachable without scrolling past a wall of controls. */
+.fbar-more { display: grid; gap: 11px; }
+.fbar-more-btn { display: none; align-items: center; gap: 7px; align-self: start; height: 34px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); font-size: 13px; font-weight: 500; color: var(--fg-2); }
+.fbar-more-btn b { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand); color: var(--on-brand, #fff); font-size: 11px; font-weight: 600; }
+.fbar-more-btn:active { transform: scale(.97); }
+
+@media (max-width: 760px) {
+  .fbar-more-btn { display: inline-flex; }
+  .fbar-more { display: none; }
+  .fbar-more.open { display: grid; }
+  .fbar-att { gap: 6px; }
+  .fbar-sum { padding-top: 2px; }
+}
+@media (prefers-reduced-motion: reduce) { .fbar-more-btn:active { transform: none; } }
+.fbar-find { align-items: center; }
+.fbar-find .fsearch { max-width: 420px; }

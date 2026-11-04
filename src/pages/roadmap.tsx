@@ -100,15 +100,11 @@ export function Roadmap() {
         <div className="rgrid">
           {list.map(c => (
             <a key={c.id} href={"#c-" + c.id} className={cx("rcard", !c.ownerId && c.status !== "completed" && "no-owner")}>
-              <span className="rcard-top"><code className="cid">{c.id}</code><LayerOfTag c={c} short /></span>
+              <span className="rcard-top"><code className="cid">{c.id}</code><LifecyclePill c={c} /></span>
               <b>{c.name}</b>
               <p>{c.summary}</p>
-              <span className="rcard-axes">
-                <LifecyclePill c={c} />
-                <span className="rcard-wave" title="Planning wave from the source sheet">{c.lib?.wave || "No wave"}</span>
-              </span>
               <span className="rcard-foot">
-                <span className="rcard-sp">{c.lib?.sps.length ? c.lib.sps.join(" · ") : "No SP mapping"}</span>
+                <span className="rcard-wave" title="Planning wave, from the source sheet">{c.lib?.wave || "No wave"}</span>
                 <OwnerState c={c} size={20} />
               </span>
             </a>

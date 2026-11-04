@@ -111,15 +111,6 @@ export function Home() {
         </div>
       </section>
 
-      <div className="kpis-3">
-        <Kpi label="Selected for this round" value={now.length} foot={`of ${cs.length} in the whole library`} lead onClick={() => openComponents({ wave: "Now" })} />
-        <Kpi label="Unassigned in this round" value={nowNoOwner.length} foot={`of the ${now.length} selected for now`} tone={nowNoOwner.length ? "kpi-alert" : undefined} onClick={() => openComponents({ owner: "__none", wave: "Now" })} />
-        <Kpi label="Open blockers" value={blockers.length} foot={blockers.length ? "waiting on a decision or a handoff" : "nothing is blocked"} tone={blockers.length ? "kpi-alert" : undefined} onClick={() => go("blockers")} />
-        <Kpi label="With QA" value={inQa} foot="checks passed, QA has not accepted yet" onClick={() => openComponents({ status: "under_review" })} />
-        <Kpi label="Waiting on a decision" value={deciding} foot="app-factory proposals, architecture not agreed" tone={deciding ? "kpi-alert" : undefined} onClick={() => openComponents({ wave: "Architecture decision" })} />
-        <Kpi label="Platform modules" value={state.modules.length} foot="SP-01 to SP-20, the backbone everything builds on" onClick={() => go("modules")} />
-      </div>
-
       <section className="pipe">
         <div className="ownstrip-head">
           <h2>Delivery pipeline</h2>

@@ -163,51 +163,43 @@ export function Blockers() {
   const pending = state.handoffs.filter(h => h.status === "awaiting_ack");
   return (
     <>
-      <PageHeader title="Blockers" sub="What's stopping progress, who is unblocking it, and by when."
+      <PageHeader title="Blockers" sub="What is stopping progress, who is clearing it, and by when."
         actions={<Button variant="primary" icon="plus" onClick={() => setModal(true)}>Raise blocker</Button>} />
-      <div className="split">
-        <section className="panel" style={{ overflow: "hidden" }}>
-          <div style={{ padding: "6px 12px 0" }} className="row-between">
-            <Tabs value={tab} onChange={setTab} tabs={[{ id: "active", label: "Active", count: active.length }, ...(state.handoffs.length ? [{ id: "handoffs", label: "Handoffs", count: pending.length || undefined }] : []), { id: "resolved", label: "Resolved", count: resolved.length }]} />
-            {tab !== "handoffs" && <select value={who} onChange={e => setWho(e.target.value)} style={{ width: "auto" }} aria-label="Responsible person"><option value="">Anyone responsible</option>{byPerson.map(([id]) => <option key={id} value={id}>{personName(person(id))}</option>)}</select>}
+
+      <div className="bl-bar">
+        <Tabs value={tab} onChange={setTab} tabs={[
+          { id: "active", label: "Active", count: active.length },
+          ...(state.handoffs.length ? [{ id: "handoffs", label: "Handoffs", count: pending.length || undefined }] : []),
+          { id: "resolved", label: "Resolved", count: resolved.length },
+        ]} />
+        {tab !== "handoffs" && byPerson.length > 0 && (
+          <div className="bl-who" role="group" aria-label="Filter by who is responsible">
+            <button className={cx("axis-chip", !who && "on")} onClick={() => setWho("")}>Anyone<b>{active.length}</b></button>
+            {byPerson.map(([id, n]) => (
+              <button key={id} className={cx("axis-chip", who === id && "on")} onClick={() => setWho(who === id ? "" : id)} aria-pressed={who === id}>
+                {personName(person(id))}<b>{n}</b>
+              </button>
+            ))}
           </div>
-          {tab === "handoffs" ? (
-            <div className="panel-body" style={{ display: "grid", gap: 12 }}>{state.handoffs.length === 0 ? <Empty icon="handoff" title="No handoffs yet" /> : state.handoffs.map(h => <HandoffCard key={h.id} h={h} />)}
-              <p className="muted" style={{ fontSize: 12.5 }}>Start a handoff from a component's <b>Assign</b> action when ownership changes on active work.</p></div>
-          ) : list.length === 0 ? (
-            <div className="panel-body" style={{ display: "grid", gap: 14 }}>
-              <div>
-                <b style={{ fontSize: 14, fontWeight: 500 }}>{tab === "active" ? "Nothing is blocked right now" : "Nothing has been resolved yet"}</b>
-                <p className="muted" style={{ fontSize: 13, marginTop: 4, maxWidth: "62ch", lineHeight: 1.55 }}>
-                  {tab === "active"
-                    ? "Raise a blocker when a component cannot move forward and the reason sits outside the person building it — an architecture decision nobody has made, access that has not been granted, or another component that has to land first."
-                    : "Resolved blockers stay here with who cleared them and when, so the same obstacle is not rediscovered next round."}
-                </p>
-              </div>
-              {tab === "active" && (
-                <div style={{ display: "grid", gap: 10, fontSize: 13, color: "var(--fg-2)" }}>
-                  <div><b style={{ fontWeight: 500, color: "var(--fg)" }}>Who clears it.</b> Every blocker names one person responsible and a date they expect to clear it by. It stays on their name until it is resolved.</div>
-                  <div><b style={{ fontWeight: 500, color: "var(--fg)" }}>Where it shows.</b> A raised blocker appears on its component's page and counts against the overview, so nobody has to ask why a component has stopped.</div>
-                  <div><b style={{ fontWeight: 500, color: "var(--fg)" }}>Handoffs are separate.</b> If work is simply changing hands, start a handoff from the component's Assign action instead.</div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="blklist">{list.map(b => <BlockerRow key={b.id} b={b} />)}</div>
-          )}
-        </section>
-        <div className="stack-v">
-          <Section title="By responsible person">
-            <div className="panel-body" style={{ display: "grid", gap: 8 }}>
-              {byPerson.length === 0 && <span className="muted">Nobody is holding a blocker.</span>}
-              {byPerson.map(([id, n]) => <button key={id} className="bar-row" onClick={() => { setWho(who === id ? "" : id); setTab("active"); }} style={{ gridTemplateColumns: "minmax(0,1fr) auto" }}><PersonChip id={id} /><span className="v">{n}</span></button>)}
-            </div>
-          </Section>
-          <Section title="Recently resolved">
-            <div className="list-plain">{resolved.slice(0, 4).map(b => <a key={b.id} href={"#c-" + b.componentId} className="li"><span><b>{b.title}</b><small>{b.id} · resolved {b.resolvedAt ? ago(b.resolvedAt) : ""}</small></span><Icon name="check" size={14} style={{ color: "var(--ok)" }} /></a>)}</div>
-          </Section>
-        </div>
+        )}
       </div>
+
+      {tab === "handoffs" ? (
+        <div style={{ display: "grid", gap: 12 }}>
+          {state.handoffs.length === 0
+            ? <Empty icon="handoff" title="No handoffs yet">Start one from a component's Assign action when ownership changes.</Empty>
+            : state.handoffs.map(h => <HandoffCard key={h.id} h={h} />)}
+        </div>
+      ) : list.length === 0 ? (
+        <Empty icon={tab === "active" ? "check" : "blockers"} title={tab === "active" ? "Nothing is blocked right now" : "Nothing has been resolved yet"}>
+          {tab === "active"
+            ? "Raise a blocker when a component cannot move forward for a reason outside the person building it."
+            : "Resolved blockers stay here with who cleared them and when."}
+        </Empty>
+      ) : (
+        <div className="panel"><div className="blklist">{list.map(b => <BlockerRow key={b.id} b={b} />)}</div></div>
+      )}
+
       {modal && <BlockerModal onClose={() => setModal(false)} />}
     </>
   );

@@ -143,7 +143,7 @@ export const NAV = [
   ] },
   { group: "Planning", items: [
     { id: "roadmap", label: "Roadmap", sub: "What is selected for now, next and later", icon: "plan" },
-    { id: "map", label: "Build order", sub: "What has to be finished first", icon: "graph" },
+    { id: "map", label: "Dependencies", sub: "Loops that need a decision before work can be sequenced", icon: "graph" },
   ] },
   { group: "Reference", items: [
     { id: "knowledge", label: "Engineering knowledge", sub: "How Apex builds, and where it is written down", icon: "about" },

@@ -39,14 +39,13 @@ export function Roadmap() {
     <>
       <header className="ph">
         <h1>Roadmap</h1>
-        <p className="lede">Two separate questions. <b>Planning wave</b> is where the component map of 20 October put a component. <b>Lifecycle</b> is how far the work has actually got. Neither one decides the other, so you can filter by both.</p>
+        <p className="lede"><b>Lifecycle</b> is how far the work has actually got. <b>Planning wave</b> is where the component map of 20 October put it. Neither decides the other, so you can filter by both.</p>
       </header>
 
-      <div className="axis">
-        <div className="axis-head">
-          <h2>Lifecycle</h2>
-          <span>What is actually happening. Worked out from owner, dependencies and status.</span>
-        </div>
+      {/* Lifecycle leads, because "what is actually happening" is the question
+          people open this page with. The planning wave stays a full dimension
+          but sits in a select, so the page is one row of filters, not two. */}
+      <div className="rm-bar">
         <div className="axis-row" role="group" aria-label="Filter by lifecycle">
           <button className={cx("axis-chip", !life && "on")} onClick={() => setLife("")}>All<b>{all.length}</b></button>
           {LIFECYCLE.map(l => (
@@ -55,42 +54,32 @@ export function Roadmap() {
             </button>
           ))}
         </div>
+        <div className="rm-wave">
+          <label htmlFor="rm-wave">Planning wave</label>
+          <select id="rm-wave" value={wave} onChange={e => setWave(e.target.value)}>
+            <option value="">Any wave ({all.length})</option>
+            {WAVES.filter(w => waveCounts[w.id]).map(w => <option key={w.id} value={w.id}>{w.label} ({waveCounts[w.id]}) — {w.hint}</option>)}
+          </select>
+        </div>
       </div>
 
-      {lifeCounts.ready === 0 && lifeCounts.assigned === 0 && (
+      {life && <p className="rm-help">{LIFECYCLE.find(l => l.id === life)!.help}</p>}
+
+      {lifeCounts.ready === 0 && lifeCounts.assigned === 0 && !life && !wave && (
         <p className="axis-note">
           <Icon name="alert" size={14} />
-          <span>
-            <b>Nothing is ready to start.</b> Every component names at least one prerequisite that is not finished, so no owned component has a clear run at it.
-            That is a dependency problem, not a staffing one. <button onClick={() => go("map")}>Open build order</button>
-          </span>
+          <span><b>Nothing is ready to start.</b> Every component names at least one prerequisite that is not finished, so no owned component has a clear run at it. <button onClick={() => go("map")}>Resolve dependencies</button></span>
         </p>
       )}
 
-      <div className="axis">
-        <div className="axis-head">
-          <h2>Planning wave</h2>
-          <span>Taken exactly from the source sheet. Not changed by this platform.</span>
-        </div>
-        <div className="axis-row" role="group" aria-label="Filter by planning wave">
-          <button className={cx("axis-chip", !wave && "on")} onClick={() => setWave("")}>All<b>{all.length}</b></button>
-          {WAVES.filter(w => waveCounts[w.id]).map(w => (
-            <button key={w.id} className={cx("axis-chip", wave === w.id && "on")} onClick={() => setWave(wave === w.id ? "" : w.id)} title={w.hint} aria-pressed={wave === w.id}>
-              {w.label}<b>{waveCounts[w.id]}</b>
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="axis-sum">
         <span><b>{list.length}</b> component{list.length === 1 ? "" : "s"}{filtered ? " match" : ""}
-          {life && <> · lifecycle <em>{LIFECYCLE.find(l => l.id === life)!.label}</em></>}
           {wave && <> · wave <em>{WAVES.find(w => w.id === wave)!.label}</em></>}
         </span>
         <span className="axis-sum-right">
-          {unassigned > 0 && <button className="axis-flag f-warn" onClick={() => { setLife("selected"); }}><i />{unassigned} with no owner</button>}
+          {unassigned > 0 && <button className="axis-flag f-warn" onClick={() => setLife("selected")}><i />{unassigned} with no owner</button>}
           {decisions > 0 && <button className="axis-flag f-review" onClick={() => setLife("awaiting_decision")}><i />{decisions} need a decision</button>}
-          {filtered && <button className="axis-clear" onClick={() => { setWave(""); setLife(""); }}>Clear filters</button>}
+          {filtered && <button className="axis-clear" onClick={() => { setWave(""); setLife(""); }}>Clear</button>}
         </span>
       </div>
 

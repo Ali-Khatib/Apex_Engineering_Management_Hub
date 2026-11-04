@@ -12,39 +12,69 @@ export const PRACTICE_CATEGORIES = ["Coding standards", "Repository conventions"
 export function Practices() {
   const { state } = useStore();
   const { go } = useNav();
-  const [q, setQ] = useState(""); const [st, setSt] = useState("");
-  const list = state.practices.filter(p => (!q || (p.title + p.summary + p.category + p.technologies.join(" ")).toLowerCase().includes(q.toLowerCase())) && (!st || practiceStatus(p).key === st));
-  const counts = (k: string) => state.practices.filter(p => practiceStatus(p).key === k).length;
+  const [q, setQ] = useState("");
+  const [onlyAttention, setOnlyAttention] = useState(false);
+
+  const needsWork = (p: Practice) => ["review_due", "outdated", "under_revision"].includes(practiceStatus(p).key);
+  const live = state.practices.filter(p => practiceStatus(p).key !== "archived");
+  const attention = live.filter(needsWork);
+
+  const list = live.filter(p => {
+    if (onlyAttention && !needsWork(p)) return false;
+    if (!q) return true;
+    const hay = (p.title + " " + p.summary + " " + p.category + " " + p.technologies.join(" ")).toLowerCase();
+    return hay.includes(q.toLowerCase());
+  });
   const cats = [...new Set(list.map(p => p.category))].sort();
+
   return (
     <>
-      <PageHeader title="Development best practices" sub="How we build at Apex. Each page has an owner and a review date; stale pages are flagged."
+      <PageHeader
+        title="Best practices"
+        sub="How Apex builds. Each page says what to do and why, and names an owner who keeps it current."
         actions={<Button variant="primary" icon="plus" onClick={() => go("p-new")}>New page</Button>} />
-      <div className="chips">
-        {[["", "All", state.practices.length], ["current", "Current", counts("current")], ["review_due", "Review due", counts("review_due")], ["outdated", "Outdated", counts("outdated")], ["under_revision", "Under revision", counts("under_revision")], ["archived", "Archived", counts("archived")]].map(([k, l, n]) =>
-          <button key={k as string} className={cx("chip", st === k && "on", (k === "outdated" || k === "review_due") && (n as number) > 0 && "chip-alert")} onClick={() => setSt(k as string)}>{l}<span className="n">{n}</span></button>)}
-        <div className="input-ic" style={{ marginLeft: "auto", minWidth: 240 }}><Icon name="search" size={15} /><input type="search" placeholder="Search guidance" value={q} onChange={e => setQ(e.target.value)} aria-label="Search best practices" /></div>
+
+      <div className="pr-bar">
+        <div className="input-ic" style={{ flex: "1 1 280px", maxWidth: 420 }}>
+          <Icon name="search" size={15} />
+          <input type="search" placeholder="Search guidance" value={q} onChange={e => setQ(e.target.value)} aria-label="Search best practices" />
+        </div>
+        {attention.length > 0 && (
+          <button className={cx("axis-chip", "lc-warn", onlyAttention && "on")} onClick={() => setOnlyAttention(v => !v)} aria-pressed={onlyAttention}>
+            <i aria-hidden />Needs review<b>{attention.length}</b>
+          </button>
+        )}
+        <span className="pr-count">{list.length} of {live.length} pages</span>
       </div>
-      <section className="panel" style={{ overflow: "hidden" }}>
-        <div className="prac" style={{ borderTop: 0, fontSize: 12, color: "var(--fg-3)", paddingBlock: 10 }}><span>Page</span><span className="p-owner">Owner</span><span>Status</span><span className="p-next">Next review</span></div>
-        {list.length === 0 && <Empty icon="practices" title="No pages match" />}
-        {cats.map(cat => (
-          <React.Fragment key={cat}>
-            <div className="group-head" style={{ fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--fg-3)" }}>{cat}</div>
-            {list.filter(p => p.category === cat).map(p => {
-              const s = practiceStatus(p); const d = daysUntil(p.nextReview);
-              return (
-                <a key={p.id} href={"#p-" + p.id} className="prac">
-                  <span style={{ minWidth: 0 }}><b>{p.title}</b><small>{p.summary} · updated {ago(p.updatedAt)}</small></span>
-                  <span className="p-owner"><PersonChip id={p.ownerId} size={20} /></span>
-                  <span><Pill tone={TONE[s.key]} dot>{s.label}</Pill></span>
-                  <span className="p-next tnum" style={{ fontSize: 13, color: d < 0 ? "var(--crit)" : "var(--fg-2)" }}>{fmtDate(p.nextReview)}<br /><small className="muted">{d < 0 ? `${-d} days overdue` : `in ${d} days`}</small></span>
-                </a>
-              );
-            })}
-          </React.Fragment>
-        ))}
-      </section>
+
+      {list.length === 0 ? (
+        <Empty icon="practices" title="Nothing matches">Try a different word, or clear the filter.</Empty>
+      ) : (
+        <div className="pr-cats">
+          {cats.map(cat => (
+            <section key={cat} className="pr-cat">
+              <h2>{cat}</h2>
+              <ul>
+                {list.filter(p => p.category === cat).map(p => {
+                  const s = practiceStatus(p);
+                  return (
+                    <li key={p.id}>
+                      <a href={"#p-" + p.id}>
+                        <span className="pr-t">
+                          {p.title}
+                          {/* Status only earns space when something is wrong with it. */}
+                          {needsWork(p) && <em className={cx("pr-flag", "f-" + s.key)}>{s.label}</em>}
+                        </span>
+                        <span className="pr-s">{p.summary}</span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
     </>
   );
 }

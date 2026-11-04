@@ -61,7 +61,8 @@ export function Graph() {
   const { openComponents } = useNav();
   const cs = state.components;
   const [open, setOpen] = useState<string | null>(null);
-  const [showLoops, setShowLoops] = useState(6);
+  const [showLoops, setShowLoops] = useState(8);
+  const [showFoundations, setShowFoundations] = useState(false);
 
   const { deps, neededBy, loops, noPrereq } = useMemo(() => analyse(cs), [cs]);
 
@@ -75,6 +76,7 @@ export function Graph() {
   const maxNeeded = foundations.length ? foundations[0].n : 1;
   const inLoop = new Set(loops.flatMap(l => l.ids));
 
+  const decided = loops.filter(l => ["decided", "deferred"].includes(state.cycleDecisions?.[l.key]?.status || "")).length;
   const sel = open ? component(open) : null;
   const selNeeds = sel ? (deps.get(sel.id) || []).map(d => component(d)).filter(Boolean) as Component[] : [];
   const selFeeds = sel ? (neededBy.get(sel.id) || []).map(d => component(d)).filter(Boolean) as Component[] : [];
@@ -82,37 +84,21 @@ export function Graph() {
   return (
     <>
       <PageHeader
-        title="Build order"
-        sub={`Every one of the ${cs.length} components names at least one other component it needs first, and ${loops.length} groups of them need each other in a loop. There is no single order to build them in until somebody decides which of those loops to break.`} />
+        title="Dependency resolution"
+        sub={`${loops.length} groups of components need each other in a loop, so neither end can be finished first. Each one needs a person to decide how to break it. Nothing here changes a dependency on its own.`} />
 
-      <div className="kpis-3" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <button className="kpi" onClick={() => openComponents({})}>
-          <span className="kpi-label">Components with nothing to wait for</span>
-          <span className="kpi-value num">{noPrereq.length}</span>
-          <span className="kpi-foot">every component names a prerequisite</span>
-        </button>
-        <button className="kpi" onClick={() => foundations[0] && setOpen(foundations[0].c.id)}>
-          <span className="kpi-label">Named as a prerequisite</span>
-          <span className="kpi-value num">{prerequisites}</span>
-          <span className="kpi-foot">of {cs.length} components, by at least one other</span>
-        </button>
-        <button className={cx("kpi", loops.length && "kpi-alert")} onClick={() => setShowLoops(loops.length)}>
-          <span className="kpi-label">Loops to break</span>
-          <span className="kpi-value num">{loops.length}</span>
-          <span className="kpi-foot">{inLoop.size} components are caught in one</span>
-        </button>
-      </div>
+      {/* The statistics are context for the decisions, not the point of the
+          page, so they are one sentence rather than three metric cards. */}
+      <p className="dr-context">
+        Every one of the {cs.length} components names at least one prerequisite, and {inLoop.size} are caught in a loop.
+        Until the loops are decided there is no valid build order for the library as a whole.
+        <button onClick={() => setShowFoundations(v => !v)}>{showFoundations ? "Hide" : "Show"} what the most work depends on</button>
+      </p>
 
-      <div className="split" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <section className="card">
-          <div className="card-head">
-            <h2>Build these first</h2>
-            <span>How many components name each one</span>
-          </div>
-          <p className="rd-note" style={{ margin: "0 18px 6px" }}>
-            Whatever is decided about the loops, the work that the most other components are waiting on
-            is worth finishing early.
-          </p>
+      {showFoundations && (
+        <section className="dr-found">
+          <h2>Most depended on</h2>
+          <p>Whatever is decided about the loops, finishing these early unblocks the most other work.</p>
           <div className="hbars">
             {foundations.map(({ c, n }, i) => (
               <button key={c.id} className="hbar" onClick={() => setOpen(c.id)}>
@@ -123,29 +109,24 @@ export function Graph() {
             ))}
           </div>
         </section>
+      )}
 
-        <section className="card">
-          <div className="card-head">
-            <h2>Loops to break</h2>
-            <span>Shortest first</span>
-          </div>
-          <p className="rd-note" style={{ margin: "0 18px 6px" }}>
-            These components each need the other, so neither can be finished first. Somebody has to decide
-            which dependency to drop or split.
-          </p>
-          <div className="cyclist">
-            {loops.length === 0 && <Empty icon="check" title="No circular dependencies" />}
-            {loops.slice(0, showLoops).map(l => <CycleCard key={l.key} loop={l} />)}
-          </div>
-          {showLoops < loops.length && (
-            <div style={{ padding: "4px 18px 16px" }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowLoops(s => s + 12)}>
-                Show more loops
-              </button>
-            </div>
-          )}
-        </section>
+      <div className="dr-head">
+        <h2>Decisions needed</h2>
+        <span>{decided} of {loops.length} decided · shortest loops first, they are usually the easiest to resolve</span>
       </div>
+
+      <div className="cyclist dr-list">
+        {loops.length === 0 && <Empty icon="check" title="No circular dependencies" />}
+        {loops.slice(0, showLoops).map(l => <CycleCard key={l.key} loop={l} />)}
+      </div>
+      {showLoops < loops.length && (
+        <div style={{ padding: "14px 0 0" }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowLoops(s => s + 12)}>
+            Show more ({loops.length - showLoops} left)
+          </button>
+        </div>
+      )}
 
       <section className="card" style={{ marginTop: 16 }}>
         <div className="card-head">

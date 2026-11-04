@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useId } from "react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import { Icon } from "./icons";
 import { useStore, useNav, useToast } from "./store";
 import type { Person, Status, Priority, ChecksState, QAState, DeployState, Component } from "./types";
@@ -241,7 +243,9 @@ export function PersonSelect({ value, onChange, allowEmpty = true, emptyLabel = 
 }
 
 // ───────────── Markdown ─────────────
-declare const marked: any; declare const DOMPurify: any;
+// Both are real module imports. They used to be read off `window`, which only
+// worked in the old CDN build; under Vite the globals were never set, so every
+// markdown block on the site silently fell back to escaped plain text.
 function basicSanitize(html: string) {
   const t = document.createElement("template"); t.innerHTML = html;
   t.content.querySelectorAll("script,style,iframe,object,embed,form").forEach(n => n.remove());
@@ -250,9 +254,9 @@ function basicSanitize(html: string) {
 }
 export function renderMd(src: string) {
   let html: string;
-  try { html = (window as any).marked ? marked.parse(src || "", { gfm: true, breaks: false }) : `<p>${(src || "").replace(/[<&]/g, c => c === "<" ? "&lt;" : "&amp;").replace(/\n\n/g, "</p><p>")}</p>`; }
+  try { html = marked.parse(src || "", { gfm: true, breaks: false, async: false }) as string; }
   catch { html = "<p>Could not render this content.</p>"; }
-  html = (window as any).DOMPurify ? DOMPurify.sanitize(html) : basicSanitize(html);
+  try { html = DOMPurify.sanitize(html); } catch { html = basicSanitize(html); }
   return html.replace(/<a href="http/g, '<a target="_blank" rel="noopener" href="http').replace(/<table>/g, '<div class="md-table"><table>').replace(/<\/table>/g, "</table></div>");
 }
 export function Markdown({ src, className }: { src: string; className?: string }) {

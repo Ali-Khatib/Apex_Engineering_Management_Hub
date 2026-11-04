@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useStore } from "../store";
-import { Markdown, PersonChip, cx, OwnerState } from "../ui";
+import { Markdown, Section, cx, OwnerState } from "../ui";
 import { WAVES, LAYERS } from "../seed";
 import { LayerOfTag } from "./lib";
 
@@ -34,10 +34,11 @@ export function Roadmap() {
           </a>
         ))}
       </div>
-      <section className="card">
-        <div className="card-head"><h2>Before anything is assigned</h2></div>
-        <Markdown src={state.plan.notes} />
-      </section>
+      <Section
+        title="Before anything is assigned"
+        sub="Nothing on this roadmap gets an owner until architecture review has worked through these checks. This is why most components still show no owner.">
+        <div className="panel-body"><Markdown src={state.plan.notes} /></div>
+      </Section>
     </>
   );
 }

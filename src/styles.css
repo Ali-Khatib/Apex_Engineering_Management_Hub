@@ -2979,3 +2979,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 @media (prefers-reduced-motion: reduce) { .fbar-more-btn:active { transform: none; } }
 .fbar-find { align-items: center; }
 .fbar-find .fsearch { max-width: 420px; }
+/* The page grid already spaces its children, so the switcher's own bottom
+   margin was stacking on top of it: about 50px of dead space between the line
+   explaining the view and the first filter. */
+.vsw { margin-bottom: 0; }
+@media (max-width: 760px) {
+  .content { gap: 22px; padding-top: 24px; }
+  .fbar { gap: 9px; }
+}

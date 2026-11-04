@@ -50,6 +50,8 @@ export function Roadmap() {
   const [owner, setOwner] = useState("");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("urgent");
+  const [more, setMore] = useState(false);
+  const narrowed = [wave, owner].filter(Boolean).length;
 
   const all = state.components;
   const counts = useMemo(() => attentionCounts(state, all), [state, all]);
@@ -90,12 +92,22 @@ export function Roadmap() {
             </button>
           ))}
         </div>
-        <div className="fbar-row">
+        {/* Same behaviour as the Components page: search stays out, the
+            narrowing controls fold away on a phone. */}
+        <div className="fbar-row fbar-find">
           <label className="fsearch">
             <Icon name="search" size={14} />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by name or ID" aria-label="Search components" />
             {q && <button onClick={() => setQ("")} aria-label="Clear search"><Icon name="x" size={12} /></button>}
           </label>
+          <button className="fbar-more-btn" onClick={() => setMore(v => !v)} aria-expanded={more}>
+            <Icon name="filter" size={13} />
+            {more ? "Hide filters" : "More filters"}{narrowed > 0 && <b>{narrowed}</b>}
+          </button>
+        </div>
+
+        <div className={cx("fbar-more", more && "open")}>
+        <div className="fbar-row">
           <label className="fsel"><span>Planning wave</span>
             <select value={wave} onChange={e => setWave(e.target.value)}>
               <option value="">Any wave</option>
@@ -117,6 +129,7 @@ export function Roadmap() {
             </label>
           )}
           {dirty && <button className="fclear" onClick={() => { setAtt("all"); setWave(""); setOwner(""); setQ(""); }}>Clear filters</button>}
+        </div>
         </div>
         <p className="fbar-sum">
           <b>{list.length}</b> of {all.length} components{att !== "all" && <> · {ATTENTION.find(a => a.id === att)!.help}</>}

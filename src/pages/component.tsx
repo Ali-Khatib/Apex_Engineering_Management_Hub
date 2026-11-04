@@ -7,6 +7,7 @@ import {
 import { risk, deployBlockers, isDone, openBlockers, fmtDate, fmtDateTime, ago, daysUntil, personName, STATUS_LABEL, stage, relDays } from "../logic";
 import { GateDots } from "../ui";
 import { LayerOfTag, WaveTag, SpChip, SOURCE_LABEL } from "./lib";
+import { Fact, Missing, Contract, ArchitectureMap, DependencyCard, NextActionBar, BlockerAlarm, YourPart } from "./componentSpec";
 import { EditComponentModal, AssignModal } from "./componentForms";
 import { BlockerModal, BlockerRow, HandoffCard } from "./blockers";
 import { HistoryLine } from "./activity";
@@ -122,36 +123,111 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
       <StatusPill s={d.status} />
     </a>
   );
+  const lib = c.lib;
   return (
     <div className="split">
       <div className="stack-v">
-        <Section title="Details" sub={`Purpose, scope, interfaces and documentation · updated ${ago(c.updatedAt)}`} actions={isAdmin && !editing && <Button size="sm" icon="edit" onClick={() => { setDraft(c.details); setEditing(true); }}>Edit details</Button>}>
-          <div className="panel-body">
+        <NextActionBar c={c} />
+        <BlockerAlarm c={c} onAdd={onBlocker} />
+
+        {/* Purpose and scope: short facts, not prose about facts. */}
+        <section className="spec">
+          <header className="spec-head"><h2>Purpose &amp; scope</h2><span>Why this exists and when to build it</span></header>
+          <div className="spec-body">
+            <p className="spec-lede">{c.purpose || c.summary}</p>
+            <dl className="facts">
+              <Fact label="Who uses it">{lib?.users || <Missing what="users" />}</Fact>
+              <Fact label="When to build it">{lib?.trigger || <Missing what="trigger" />}</Fact>
+              <Fact label="Expected deliverable" wide>{c.deliverable || <Missing what="deliverable" />}</Fact>
+              {lib?.mapping && <Fact label="Reuse before building" wide>{lib.mapping}</Fact>}
+            </dl>
+          </div>
+        </section>
+
+        {lib && (
+          <section className="spec">
+            <header className="spec-head"><h2>What it does</h2><span>The operation contract recorded for this component</span></header>
+            <div className="spec-body"><Contract c={c} /></div>
+          </section>
+        )}
+
+        <section className="spec">
+          <header className="spec-head"><h2>Architecture</h2><span>Relationships recorded on this component. Select a node to open it.</span></header>
+          <div className="spec-body"><ArchitectureMap c={c} /></div>
+        </section>
+
+        <section className="spec">
+          <header className="spec-head">
+            <h2>Acceptance criteria</h2>
+            <span>{c.criteria.filter(k => k.status === "accepted").length} of {c.criteria.length} accepted · each needs its own evidence</span>
+          </header>
+          <div className="spec-body">
+            {c.criteria.length === 0 ? <Missing what="acceptance criteria" /> : (
+              <ol className="acl">
+                {c.criteria.map(k => (
+                  <li key={k.id} className={cx("acl-item", "s-" + k.status)}>
+                    <div className="acl-t"><b>{k.text}</b><CritStatusPill k={k} /></div>
+                    <dl className="facts facts-tight">
+                      <Fact label="Verified by">{k.verification}</Fact>
+                      <Fact label="Evidence">{k.evidenceType}</Fact>
+                    </dl>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <button className="spec-link" onClick={() => onTab("acceptance")}>Open readiness and evidence <Icon name="arrowRight" size={13} /></button>
+          </div>
+        </section>
+
+        {(lib?.constraints || lib?.overlap || lib?.metric || lib?.test) && (
+          <section className="spec">
+            <header className="spec-head"><h2>Open questions &amp; measurement</h2><span>Recorded in the component map, not yet resolved</span></header>
+            <div className="spec-body spec-body-flush">
+              {lib?.constraints && <div className="note note-warn"><h5>Constraints and open questions</h5><p>{lib.constraints}</p></div>}
+              {lib?.overlap && <div className="note note-info"><h5>Overlap review</h5><p>{lib.overlap}</p></div>}
+              {(lib?.metric || lib?.test) && (
+                <dl className="facts facts-pad">
+                  {lib?.metric && <Fact label="Measured by" wide>{lib.metric}</Fact>}
+                  {lib?.test && <Fact label="Failure-case test" wide>{lib.test}</Fact>}
+                </dl>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* The generated document is kept, folded away, and still editable. */}
+        <details className="spec-raw">
+          <summary><Icon name="chevronRight" size={13} />Full written specification<em>updated {ago(c.updatedAt)}</em></summary>
+          <div className="spec-raw-body">
             {editing ? (
               <div style={{ display: "grid", gap: 12 }}>
                 <MarkdownEditor value={draft} onChange={setDraft} rows={18} />
                 <div className="row" style={{ justifyContent: "flex-end" }}><Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button><Button variant="primary" icon="check" onClick={() => { updateComponent(c.id, { details: draft }); setEditing(false); toast("Details saved"); }}>Save details</Button></div>
               </div>
-            ) : <Markdown src={c.details} />}
+            ) : (
+              <>
+                {isAdmin && <div className="row" style={{ justifyContent: "flex-end" }}><Button size="sm" icon="edit" onClick={() => { setDraft(c.details); setEditing(true); }}>Edit details</Button></div>}
+                <Markdown src={c.details} />
+              </>
+            )}
           </div>
-        </Section>
+        </details>
       </div>
       <div className="stack-v">
-        <Section title="Blockers" actions={<Button size="sm" variant="ghost" icon="plus" onClick={onBlocker}>Add</Button>}>
-          <div className="list-plain">
-            {state.blockers.filter(b => b.componentId === c.id && !["resolved", "closed"].includes(b.status)).map(b => (
-              <a key={b.id} href="#blockers" className="li"><span style={{ minWidth: 0 }}><b>{b.title}</b><small>{b.nextAction}</small></span><span className="due due-over" style={{ fontSize: 12.5 }}>{fmtDate(b.target)}</span></a>
-            ))}
-            {!state.blockers.some(b => b.componentId === c.id && !["resolved", "closed"].includes(b.status)) && <span className="muted" style={{ fontSize: 13 }}>Nothing is blocking this component.</span>}
+        <YourPart c={c} />
+        <Section title="Needs these first" sub={deps.length ? "Nothing here can be skipped: each must finish before this ships" : undefined}>
+          <div className="panel-body" style={{ display: "grid", gap: 10 }}>
+            {deps.length ? deps.map(d => <DependencyCard key={d.id} d={d} direction="needs" />) : <span className="muted" style={{ fontSize: 13 }}>No dependencies recorded.</span>}
           </div>
         </Section>
-        <Section title="Needs these first" sub={deps.length ? "Must be finished before this one can ship" : undefined}>
-          <div className="panel-body" style={{ display: "grid", gap: 14 }}>
-            <div className="deps">{deps.length ? deps.map(depRow) : <span className="muted" style={{ fontSize: 13 }}>No dependencies.</span>}</div>
-            {dependents.length > 0 && <><span className="muted" style={{ fontSize: 12.5 }}>Waiting on this: {dependents.length} component{dependents.length > 1 ? "s" : ""}</span><div className="deps">{dependents.map(depRow)}</div></>}
-            <a href="#graph" style={{ fontSize: 13 }}>Open in dependency graph →</a>
-          </div>
-        </Section>
+        {dependents.length > 0 && (
+          <Section title="Waiting on this" sub={`${dependents.length} component${dependents.length > 1 ? "s" : ""} cannot finish until this one does`}>
+            <div className="panel-body" style={{ display: "grid", gap: 10 }}>
+              {dependents.slice(0, 6).map(d => <DependencyCard key={d.id} d={d} direction="feeds" />)}
+              {dependents.length > 6 && <a href="#map" style={{ fontSize: 13 }}>See all {dependents.length} in build order →</a>}
+            </div>
+          </Section>
+        )}
         <Section title="Linked systems" sub="Each system keeps its own records" actions={can.ownerOrAdmin(c) && <Button size="sm" icon="plus" variant="ghost" onClick={() => setLinkOpen(true)}>Link</Button>}>
           <div className="panel-body"><div className="links">
             {c.links.length === 0 && <span className="muted" style={{ fontSize: 13 }}>No linked records.</span>}

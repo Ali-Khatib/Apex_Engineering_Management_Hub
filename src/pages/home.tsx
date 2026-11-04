@@ -2,8 +2,8 @@ import { Primer } from "./primer";
 import React, { useMemo } from "react";
 import { useStore, useNav } from "../store";
 import { Icon } from "../icons";
-import { Empty, PageHeader, Button, cx } from "../ui";
-import { isDone, OPEN_BLOCKER, kpis, risk, stage, PRIORITY_ORDER, ownershipCounts, OWNERSHIP, OWNERSHIP_ORDER } from "../logic";
+import { Empty, PageHeader, Button, cx, PriorityPill, PersonChip } from "../ui";
+import { isDone, OPEN_BLOCKER, kpis, risk, stage, PRIORITY_ORDER, ownershipCounts, OWNERSHIP, OWNERSHIP_ORDER, nextAction, fmtDate, personName } from "../logic";
 import { LAYERS, LAYER_ORDER } from "../seed";
 import { LayerOfTag, WaveTag, BarChart } from "./lib";
 
@@ -18,7 +18,7 @@ function Kpi({ label, value, foot, tone, lead, onClick }: { label: string; value
 }
 
 export function Home() {
-  const { state } = useStore();
+  const { state, person } = useStore();
   const { openComponents, go } = useNav();
   const cs = state.components;
   const k = kpis(state);
@@ -75,6 +75,7 @@ export function Home() {
   const maxBucket = Math.max(1, ...counts.map(c => c.n));
 
   // The one finding: what most needs saying today.
+  const D0 = new Date().toISOString().slice(0, 10);
   const own = useMemo(() => ownershipCounts(cs, state.me), [cs, state.me]);
 
   const finding = nowNoOwner.length === now.length && now.length > 0
@@ -119,6 +120,54 @@ export function Home() {
         <Kpi label="Platform modules" value={state.modules.length} foot="SP-01 to SP-20, the backbone everything builds on" onClick={() => go("modules")} />
       </div>
 
+      <section className="pipe">
+        <div className="ownstrip-head">
+          <h2>Delivery pipeline</h2>
+          <p>Three approvals, each independent. A component can hold a pass on one and nothing on the next. These never roll up into a single figure.</p>
+        </div>
+        <div className="pipe-row">
+          {([
+            ["Checks passed", cs.filter(x => x.gates.checks.state === "passed").length, "the pipeline ran and succeeded", "ok"],
+            ["Checks failing", cs.filter(x => x.gates.checks.state === "failed").length, "needs the owner, not QA", "crit"],
+            ["Awaiting QA", cs.filter(x => ["awaiting", "in_progress"].includes(x.gates.qa.state)).length, "a QA decision is outstanding", "warn"],
+            ["QA accepted", cs.filter(x => x.gates.qa.state === "accepted").length, "accepted on the exact build", "ok"],
+            ["Awaiting deployment", cs.filter(x => x.gates.qa.state === "accepted" && !["ready", "scheduled", "deployed"].includes(x.gates.deploy.state)).length, "QA done, approval outstanding", "review"],
+            ["Deployed", cs.filter(x => x.gates.deploy.state === "deployed").length, "shipped", "ok"],
+          ] as [string, number, string, string][]).map(([label, n, foot, tone]) => (
+            <button key={label} className={cx("pipebox", "p-" + tone)} onClick={() => go("qa")}>
+              <strong>{n}</strong><span>{label}</span><small>{foot}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="pipe">
+        <div className="ownstrip-head">
+          <h2>Workload</h2>
+          <p>What each engineer actually owns. No component carries an effort estimate, so capacity cannot be calculated and nothing here claims to.</p>
+        </div>
+        <div className="wkload">
+          {state.people.map(pp => {
+            const owned = cs.filter(x => x.ownerId === pp.id);
+            if (!owned.length) return null;
+            const active = owned.filter(x => !isDone(x));
+            const blocked = active.filter(x => risk(state, x).level === "blocked").length;
+            const over = active.filter(x => x.due && x.due < D0 && !isDone(x)).length;
+            const nextDue = active.map(x => x.due).filter(Boolean).sort()[0];
+            return (
+              <button key={pp.id} className="wkrow" onClick={() => openComponents({ owner: pp.id })}>
+                <PersonChip id={pp.id} size={26} />
+                <span className="wkn">{active.length}<small>active</small></span>
+                <span className={cx("wkn", blocked && "t-crit-text")}>{blocked}<small>blocked</small></span>
+                <span className={cx("wkn", over && "t-warn-text")}>{over}<small>overdue</small></span>
+                <span className="wkn">{owned.length - active.length}<small>done</small></span>
+                <span className="wknext">{nextDue ? <>next due {fmtDate(nextDue)}</> : "no dated work"}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       <div className="split">
         <section className="card">
           <div className="card-head">
@@ -134,13 +183,24 @@ export function Home() {
           </p>
           <div className="list">
             {atRisk
-              ? attention.slice(0, 6).map(({ c, r }) => (
-                <a key={c.id} href={"#c-" + c.id} className="li3">
-                  <code className="cid">{c.id}</code>
-                  <span className="li3-main"><b>{c.name}</b><small className={r.level === "blocked" ? "t-crit-text" : "t-warn-text"}>{r.reasons[0]}</small></span>
-                  <WaveTag wave={c.lib?.wave} />
-                </a>
-              ))
+              ? attention.slice(0, 6).map(({ c, r }) => {
+                const na = nextAction(state, c);
+                return (
+                  <a key={c.id} href={"#c-" + c.id} className={cx("atrow", r.level === "blocked" && "is-blocked")}>
+                    <span className="atrow-top">
+                      <code className="cid">{c.id}</code>
+                      <b>{c.name}</b>
+                      <PriorityPill p={c.priority} />
+                      <span className="atrow-due">{c.due ? fmtDate(c.due) : "no date"}</span>
+                    </span>
+                    <span className={cx("atrow-why", r.level === "blocked" ? "t-crit-text" : "t-warn-text")}>{r.reasons[0]}</span>
+                    <span className="atrow-next">
+                      <span>Next</span>{na.text}
+                      <em>{na.who ? personName(person(na.who)) : c.ownerId ? personName(person(c.ownerId)) : "nobody assigned"}</em>
+                    </span>
+                  </a>
+                );
+              })
               : startable.slice(0, 6).map(({ c, n }) => (
                 <a key={c.id} href={"#c-" + c.id} className="li3">
                   <code className="cid">{c.id}</code>

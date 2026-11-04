@@ -330,14 +330,23 @@ export const EMPTY_FILTER: CompFilter = { quick: "all", project: "", priority: "
 const NavCtx = createContext<{ route: string; go: (r: string) => void; filter: CompFilter; setFilter: (f: CompFilter) => void; openComponents: (f: Partial<CompFilter>) => void }>(null as any);
 export const useNav = () => useContext(NavCtx);
 const readHash = () => (location.hash || "").replace(/^#/, "") || "home";
+const toTop = () => {
+  window.scrollTo(0, 0);
+  if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+};
+
 export function NavProvider({ children }: { children: React.ReactNode }) {
   const [route, setRoute] = useState(readHash);
   const [filter, setFilter] = useState<CompFilter>(EMPTY_FILTER);
   useEffect(() => {
-    const on = () => { setRoute(readHash()); window.scrollTo(0, 0); };
+    // Which element actually scrolls depends on the overflow rules in play, so
+    // reset all three rather than assume. Landing part-way down a page you have
+    // not seen reads as a broken link.
+    const on = () => { setRoute(readHash()); toTop(); };
     window.addEventListener("hashchange", on); return () => window.removeEventListener("hashchange", on);
   }, []);
-  const go = useCallback((r: string) => { if (readHash() === r) { setRoute(r); window.scrollTo(0, 0); } else location.hash = r; }, []);
+  const go = useCallback((r: string) => { if (readHash() === r) { setRoute(r); toTop(); } else location.hash = r; }, []);
   const openComponents = useCallback((f: Partial<CompFilter>) => { setFilter({ ...EMPTY_FILTER, ...f }); go("library"); }, [go]);
   const v = useMemo(() => ({ route, go, filter, setFilter, openComponents }), [route, go, filter, openComponents]);
   return <NavCtx.Provider value={v}>{children}</NavCtx.Provider>;

@@ -20,6 +20,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; }
+body { margin: 0; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
 body.no-scroll { overflow: hidden; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: var(--surface); }
@@ -2223,7 +2224,8 @@ button.li3:hover, button.li:hover { background: var(--surface-2); }
 .blki-due.is-over em { color: var(--crit); }
 
 /* Last line of defence: nothing may push the page sideways. */
-html, body { max-width: 100%; overflow-x: hidden; }
+html { max-width: 100%; overflow-x: clip; }
+body { max-width: 100%; overflow-x: clip; }
 .page, .shell-main { min-width: 0; max-width: 100%; }
 
 /* ───────── QA workspace ───────── */

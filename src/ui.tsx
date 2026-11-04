@@ -4,7 +4,7 @@ import DOMPurify from "dompurify";
 import { Icon } from "./icons";
 import { useStore, useNav, useToast } from "./store";
 import type { Person, Status, Priority, ChecksState, QAState, DeployState, Component } from "./types";
-import { initials, personName, STATUS_LABEL, risk, stage, STAGE_LABEL, fmtDate, daysUntil, relDays, ownership, OWNERSHIP } from "./logic";
+import { initials, personName, STATUS_LABEL, risk, stage, STAGE_LABEL, fmtDate, daysUntil, relDays, ownership, OWNERSHIP, lifecycle, LIFECYCLE_LABEL, LIFECYCLE_TONE, LIFECYCLE } from "./logic";
 
 export const cx = (...a: any[]) => a.filter(Boolean).join(" ");
 
@@ -43,6 +43,18 @@ export function OwnerState({ c, size = 20 }: { c: Component; size?: number }) {
   if (o === "completed") return <span className="ost ost-completed" title={p ? `Completed by ${personName(p)}` : meta.help}>{p ? <Avatar p={p} size={size} /> : <Icon name="check" size={12} />}Completed</span>;
   if (o === "mine") return <span className="ost ost-mine" title={meta.help}><Avatar p={p} size={size} />You</span>;
   return <span className="ost ost-theirs" title={meta.help}><Avatar p={p} size={size} /><span className="ost-name">{personName(p)}</span></span>;
+}
+
+/**
+ * Lifecycle: how far the work has actually got. Shown wherever a component
+ * appears on its own. It is a different question from the wave, which is the
+ * source sheet's planning classification, so the two never replace each other.
+ */
+export function LifecyclePill({ c, help }: { c: Component; help?: boolean }) {
+  const { state } = useStore();
+  const l = lifecycle(state, c);
+  const meta = LIFECYCLE.find(x => x.id === l)!;
+  return <Pill tone={LIFECYCLE_TONE[l]} dot title={help ? meta.help : undefined}>{LIFECYCLE_LABEL[l]}</Pill>;
 }
 
 const PRI_TONE: Record<Priority, string> = { critical: "crit-solid", high: "warn", medium: "neutral", low: "faint" };

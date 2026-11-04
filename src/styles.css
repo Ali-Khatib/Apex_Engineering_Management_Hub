@@ -2131,3 +2131,51 @@ button.li3:hover, button.li:hover { background: var(--surface-2); }
 .ypart.y-act span { color: var(--fg-2); }
 .ypart.y-done { border-left-color: var(--ok); }
 .ypart.y-wait { border-left-color: var(--warn); }
+
+/* ───────── Roadmap: two independent axes ───────── */
+.axis { margin: 0 0 18px; }
+.axis-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 9px; }
+.axis-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--fg); }
+.axis-head span { font-size: 12.5px; color: var(--fg-3); }
+.axis-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.axis-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--fg-2); font-size: 13px; white-space: nowrap;
+  transition: border-color var(--t-ui) var(--ease), background-color var(--t-ui) var(--ease), color var(--t-ui) var(--ease);
+}
+.axis-chip:hover { border-color: var(--line-strong); color: var(--fg); }
+.axis-chip b { font-weight: 600; font-size: 12px; color: var(--fg-4); font-variant-numeric: tabular-nums; }
+.axis-chip.on { border-color: var(--brand); background: var(--brand-wash); color: var(--brand-ink); font-weight: 500; }
+.axis-chip.on b { color: var(--brand-ink); }
+.axis-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-4); flex: none; }
+.axis-chip.lc-ok i { background: var(--ok); }
+.axis-chip.lc-warn i { background: var(--warn); }
+.axis-chip.lc-info i { background: var(--info); }
+.axis-chip.lc-review i { background: var(--review); }
+.axis-chip.lc-neutral i { background: var(--fg-4); }
+
+.axis-sum { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 11px 0 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--fg-3); }
+.axis-sum b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.axis-sum em { font-style: normal; color: var(--fg-2); font-weight: 500; }
+.axis-sum-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.axis-flag { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: var(--r-pill); border: 1px solid; background: none; font-size: 12.5px; font-weight: 500; }
+.axis-flag i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.axis-flag.f-warn { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
+.axis-flag.f-review { color: var(--review); border-color: var(--review-line); background: var(--review-bg); }
+.axis-flag:hover { filter: brightness(.96); }
+.axis-clear { border: 0; background: none; color: var(--fg-3); font-size: 12.5px; text-decoration: underline; }
+.axis-clear:hover { color: var(--fg); }
+
+.rcard-axes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.rcard-wave { font-size: 11.5px; padding: 2px 8px; border-radius: var(--r-pill); border: 1px dashed var(--line-strong); color: var(--fg-3); white-space: nowrap; }
+.rcard.no-owner { border-left: 3px solid var(--warn); }
+
+/* two-question labels in the component hero */
+.summary-5 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.dt-q { display: inline-grid; place-items: center; width: 13px; height: 13px; margin-left: 4px; border-radius: 50%; border: 1px solid var(--line-strong); color: var(--fg-4); font-size: 9px; font-style: normal; cursor: help; vertical-align: 1px; }
+.dt-q:hover { color: var(--fg-2); border-color: var(--fg-4); }
+.axis-note { display: flex; align-items: flex-start; gap: 9px; margin: -6px 0 18px; padding: 11px 14px; border: 1px solid var(--warn-line); background: var(--warn-bg); border-radius: var(--r); font-size: 13px; line-height: 1.55; color: var(--fg-2); }
+.axis-note > svg { flex: none; margin-top: 1px; color: var(--warn); }
+.axis-note b { color: var(--fg); font-weight: 600; }
+.axis-note button { border: 0; background: none; padding: 0; color: var(--brand-ink); font-size: 13px; font-weight: 500; text-decoration: underline; }

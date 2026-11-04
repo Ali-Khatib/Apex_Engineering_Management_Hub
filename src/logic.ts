@@ -224,3 +224,50 @@ export function byUrgency(s: AppState) {
       || (a.due || "9999").localeCompare(b.due || "9999");
   };
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   LIFECYCLE — the execution axis.
+
+   Wave (lib.wave) is the source sheet's planning classification and is never
+   touched. Lifecycle is derived at read time from records that already exist:
+   status, owner, dependencies and the readiness gates. Nothing is stored, so
+   nothing can drift out of step with the sheet, and a component's lifecycle
+   never implies anything about its wave.
+   ────────────────────────────────────────────────────────────────────────── */
+export type Lifecycle = "proposed" | "awaiting_decision" | "selected" | "assigned" | "ready" | "in_progress" | "completed";
+
+export const LIFECYCLE: { id: Lifecycle; label: string; help: string; tone: string }[] = [
+  { id: "proposed", label: "Proposed", help: "Specified, but not chosen for a round yet.", tone: "neutral" },
+  { id: "awaiting_decision", label: "Awaiting decision", help: "Needs an architecture or approval decision before anyone can build it.", tone: "review" },
+  { id: "selected", label: "Selected for a round", help: "Chosen to be built, but nobody owns it yet. Selection is not assignment.", tone: "warn" },
+  { id: "assigned", label: "Assigned", help: "Has an owner, but a prerequisite is still unfinished.", tone: "info" },
+  { id: "ready", label: "Ready to start", help: "Owned, and every prerequisite is complete. Work can begin.", tone: "ok" },
+  { id: "in_progress", label: "In progress", help: "Being built, reviewed, or blocked while in flight.", tone: "info" },
+  { id: "completed", label: "Completed", help: "Checks passed, QA accepted and deployment approved.", tone: "ok" },
+];
+export const LIFECYCLE_LABEL = Object.fromEntries(LIFECYCLE.map(l => [l.id, l.label])) as Record<Lifecycle, string>;
+export const LIFECYCLE_TONE = Object.fromEntries(LIFECYCLE.map(l => [l.id, l.tone])) as Record<Lifecycle, string>;
+
+/** Waves the source sheet uses to mean "picked for a development cycle". */
+export const SELECTED_WAVES = ["Now", "P0"];
+/** Waves that mean a decision has to happen before any build. */
+export const DECISION_WAVES = ["Architecture decision", "Gated"];
+
+export function lifecycle(s: AppState, c: Component): Lifecycle {
+  if (isDone(c)) return "completed";
+  if (c.status === "in_progress" || c.status === "blocked" || c.status === "under_review") return "in_progress";
+  if (c.ownerId) {
+    const pending = c.deps.map(id => s.components.find(x => x.id === id)).filter(d => d && !isDone(d));
+    return pending.length ? "assigned" : "ready";
+  }
+  const w = c.lib?.wave || "";
+  if (DECISION_WAVES.includes(w)) return "awaiting_decision";
+  if (SELECTED_WAVES.includes(w)) return "selected";
+  return "proposed";
+}
+
+export function lifecycleCounts(s: AppState, cs: Component[]) {
+  const n = Object.fromEntries(LIFECYCLE.map(l => [l.id, 0])) as Record<Lifecycle, number>;
+  for (const c of cs) n[lifecycle(s, c)]++;
+  return n;
+}

@@ -7,6 +7,8 @@ import {
 import { risk, deployBlockers, isDone, openBlockers, fmtDate, fmtDateTime, ago, daysUntil, personName, STATUS_LABEL, stage, relDays } from "../logic";
 import { GateDots } from "../ui";
 import { LayerOfTag, WaveTag, SpChip, SOURCE_LABEL } from "./lib";
+import { LifecyclePill } from "../ui";
+import { WAVES } from "../seed";
 import { Fact, Missing, Contract, ArchitectureMap, DependencyCard, NextActionBar, BlockerAlarm, YourPart } from "./componentSpec";
 import { EditComponentModal, AssignModal } from "./componentForms";
 import { BlockerModal, BlockerRow, HandoffCard } from "./blockers";
@@ -56,7 +58,7 @@ export function ComponentPage({ id }: { id: string }) {
       <div className="comp-hero">
         <div className="row-between" style={{ alignItems: "flex-start" }}>
           <div style={{ minWidth: 0, flex: "1 1 480px" }}>
-            <div className="ctags"><code className="cid cid-lg">{c.id}</code><LayerOfTag c={c} /><WaveTag wave={c.lib?.wave} />{c.lib && <span className="srctag">{SOURCE_LABEL[c.projectId]}</span>}</div>
+            <div className="ctags"><code className="cid cid-lg">{c.id}</code><StatusPill s={c.status} /><LayerOfTag c={c} />{c.lib && <span className="srctag">{SOURCE_LABEL[c.projectId]}</span>}</div>
             <h1>{c.name}</h1>
             <p className="lead">{c.summary}</p>
           </div>
@@ -77,8 +79,9 @@ export function ComponentPage({ id }: { id: string }) {
           </div>
         </div>
 
-        <dl className="summary summary-4">
-          <div><dt>Status</dt><dd><StatusPill s={c.status} /></dd></div>
+        <dl className="summary summary-5">
+          <div><dt>Lifecycle <i className="dt-q" title="How far the work has actually got. Derived from owner, dependencies and status.">?</i></dt><dd><LifecyclePill c={c} help /></dd></div>
+          <div><dt>Planning wave <i className="dt-q" title="The source sheet's planning classification, from the component map of 20 October 2026. Independent of lifecycle.">?</i></dt><dd><WaveTag wave={c.lib?.wave} /> <span className="muted" style={{ fontSize: 12.5 }}>{WAVES.find(w => w.id === c.lib?.wave)?.hint}</span></dd></div>
           <div><dt>Owner</dt><dd><PersonChip id={c.ownerId} /></dd></div>
           <div><dt>Builds on</dt><dd className="spwrap">{c.lib?.sps.length ? c.lib.sps.map(s => <SpChip key={s} id={s} />) : <span className="muted">No SP module yet</span>}</dd></div>
           <div><dt>Ready to ship?</dt><dd><GateDots c={c} showLabel /></dd></div>

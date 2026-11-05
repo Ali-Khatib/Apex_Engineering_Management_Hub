@@ -112,9 +112,11 @@ adoption migration; do not stamp or run `upgrade head`. Startup executes
 `alembic upgrade head`, so existing unversioned databases must be safely
 adopted before starting the application.
 
-**Production is the exception.** With `APEX_ENV=production` the app does not
-migrate at startup. Run `alembic upgrade head` by hand after a verified backup,
-or set `APEX_AUTO_MIGRATE=1` for that one deploy and unset it afterwards.
+**Startup only migrates when told to.** The app runs `alembic upgrade head` at
+startup only when `APEX_AUTO_MIGRATE=1`, in every environment. Otherwise it
+never changes the schema. For a first local run set it to 1 once, or run
+`alembic upgrade head` by hand. For any shared or production database, take and
+verify a backup first.
 
 ---
 

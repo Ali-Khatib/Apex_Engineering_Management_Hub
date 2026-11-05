@@ -1,6 +1,7 @@
 import json, os, tempfile
 os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/t.db"
 os.environ["ALLOW_SIMULATED_GITHUB"] = "1"
+os.environ["APEX_AUTO_MIGRATE"] = "1"  # scratch SQLite only
 from fastapi.testclient import TestClient
 from app.main import app
 from app import github as gh

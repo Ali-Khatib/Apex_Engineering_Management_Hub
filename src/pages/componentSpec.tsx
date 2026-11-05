@@ -208,7 +208,7 @@ export function BlockerAlarm({ c, onAdd }: { c: Component; onAdd: () => void }) 
       </div>
       {ob.map(b => (
         <div key={b.id} className="balarm-item">
-          <div className="balarm-t"><code>{b.id}</code><b>{b.title}</b><Pill tone={b.severity === "critical" ? "crit-solid" : b.severity === "high" ? "crit" : "warn"}>{b.severity}</Pill></div>
+          <div className="balarm-t"><code>{b.id}</code><b>{b.title}</b><Pill tone={b.severity === "critical" ? "crit-solid" : b.severity === "high" ? "crit" : b.severity === "medium" ? "warn" : "neutral"}>{b.severity}</Pill></div>
           <p>{b.description}</p>
           <dl className="balarm-dl">
             <Fact label="Next action">{b.nextAction}</Fact>

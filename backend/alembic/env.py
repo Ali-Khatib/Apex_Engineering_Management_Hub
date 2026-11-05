@@ -28,7 +28,7 @@ if not DATABASE_URL:
         "DATABASE_URL must be set. Alembic will not guess a database, because "
         "guessing one is how a migration ends up on the wrong server."
     )
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

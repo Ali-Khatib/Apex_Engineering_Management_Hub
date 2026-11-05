@@ -1,9 +1,18 @@
-// Application store. In production each action becomes an API call (Supabase/Postgres);
-// here it mutates a local copy so the prototype is fully interactive.
+// The local demo mutates a browser copy; API mode persists only supported backend operations.
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
-import type { AppState, Component, Person, Blocker, Handoff, Practice, Milestone, Evidence, Criterion, Contact, HistoryEntry, Notice, ArchFile, ExtLink, QAState, DeployState, Status } from "./types";
+import type { AppState, Component, Person, Repo, Blocker, Handoff, Practice, Milestone, Evidence, Criterion, Contact, HistoryEntry, Notice, ArchFile, ExtLink, QAState, DeployState, Status } from "./types";
 import { seedState } from "./seed";
 import { nowIso, iso, today, addDays, personName, STATUS_LABEL } from "./logic";
+import {
+  ApiError, CodeIndex, addComponentComment as postComment, addDependency as postDependency,
+  apiEnabled, createComponent as postComponent, deleteComponent as deleteServerComponent,
+  deleteDependency as deleteServerDependency, getComponent, getGraph, getToken,
+  listBlockers, addServerBlocker, resolveServerBlocker,
+  listComponents, listRepositories, listUsers, login as apiLogin, logout as apiLogout,
+  me as getCurrentUser, patchComponent, recordAcceptance, requestComponentReview,
+  setComponentGate, toComponent, toPerson, fromPriority, fromStatus,
+} from "./api";
+import type { ServerBlocker, ServerComponentDetail, ServerRepo } from "./api";
 
 const KEY = "apex-eip-v8";
 let n = 0; const uid = (p: string) => `${p}${Date.now().toString(36)}${(n++).toString(36)}`;
@@ -11,6 +20,42 @@ let n = 0; const uid = (p: string) => `${p}${Date.now().toString(36)}${(n++).toS
 function load(): AppState {
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.version === 8) return s; } } catch { /* storage unavailable */ }
   return seedState();
+}
+
+function toRepo(r: ServerRepo): Repo {
+  const [org, ...name] = r.full_name.split("/");
+  const ci: Repo["ci"] = r.ci === "success" ? "passed" : r.ci === "failure" ? "failed" : r.ci === "running" ? "running" : "unknown";
+  return {
+    id: String(r.id), name: name.join("/") || r.full_name, org, url: r.url, description: r.description,
+    defaultBranch: r.default_branch, visibility: "unknown", languages: [], frameworks: [],
+    ownerId: null, reviewerId: null, pmId: null, access: "unknown",
+    accessNote: "GitHub App access is not exposed by this API response.",
+    ci, workflow: "", env: { dev: "", staging: "", prod: "" }, build: "", test: "",
+    products: [], services: [], createdAt: "", githubActivityLoaded: false,
+    github: { readme: "", commits: [], prs: [], issues: [], runs: [], branches: [], contributors: [] },
+  };
+}
+
+function toBlocker(b: ServerBlocker): Blocker {
+  const severity = ["critical", "high", "medium", "low"].includes(b.severity ?? "")
+    ? b.severity as Blocker["severity"] : "unspecified";
+  return {
+    id: `BLK-${String(b.id).padStart(3, "0")}`,
+    componentId: b.component_code,
+    title: b.title || b.description.slice(0, 100) || "Blocker",
+    description: b.description,
+    category: b.category || "Unspecified",
+    severity,
+    responsibleId: b.responsible_id === null ? null : String(b.responsible_id),
+    reportedBy: b.raised_by ? String(b.raised_by.id) : "",
+    nextAction: b.next_action || "",
+    target: b.target_date || "",
+    status: b.resolved ? "resolved" : "open",
+    createdAt: b.created_at,
+    updatedAt: b.resolved_at || b.created_at,
+    resolvedAt: b.resolved_at || undefined,
+    slack: b.slack || undefined,
+  };
 }
 
 type Ctx = ReturnType<typeof useProvideStore>;
@@ -34,20 +79,195 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 const FIELD_LABEL: Record<string, string> = { ownerId: "owner", reviewerId: "reviewer", qaId: "QA contact", priority: "priority", status: "status", due: "due date", eta: "ETA", start: "start date", repoId: "repository", projectId: "project", category: "category", name: "name", deliverable: "expected deliverable" };
 
 function useProvideStore() {
-  const [state, setState] = useState<AppState>(load);
+  const [state, setState] = useState<AppState>(() => {
+    const initial = load();
+    if (apiEnabled()) initial.me = null;
+    return initial;
+  });
   const [saveError, setSaveError] = useState(false);
+  const [authLoading, setAuthLoading] = useState(apiEnabled() && Boolean(getToken()));
+  const [authError, setAuthError] = useState<string | null>(null);
   const timer = useRef<any>(null);
+  const { toast } = useToast();
+  const codeIndex = useRef(new CodeIndex());
+  const edgeIndex = useRef(new Map<string, number>());
+  const libraryIndex = useRef(new Map<string, Component>());
 
   useEffect(() => {
+    if (apiEnabled()) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try { localStorage.setItem(KEY, JSON.stringify(state)); setSaveError(false); } catch { setSaveError(true); }
     }, 250);
   }, [state]);
 
+  const hydrateApi = useCallback(async () => {
+    const [currentUser, users, serverComponents, graph, serverRepos, serverBlockers] = await Promise.all([
+      getCurrentUser(), listUsers(), listComponents(), getGraph(), listRepositories(), listBlockers(),
+    ]);
+    const local = seedState();
+    const libraryByCode = new Map(local.components.map(c => [c.id, c]));
+    const codeById = new Map(serverComponents.map(c => [c.id, c.code]));
+    codeIndex.current.load(serverComponents);
+    edgeIndex.current = new Map(graph.edges.map(edge => [`${edge.from}:${edge.to}`, edge.id]));
+    libraryIndex.current = libraryByCode;
+    const components = serverComponents.map(server => {
+      const component = toComponent(server);
+      const libraryComponent = libraryByCode.get(server.code);
+      component.lib = libraryComponent?.lib ?? null;
+      component.projectId = libraryComponent?.projectId ?? "";
+      component.purpose = libraryComponent?.purpose ?? component.summary;
+      component.details = libraryComponent?.details ?? "";
+      component.deps = graph.edges
+        .filter(edge => edge.from === server.id)
+        .map(edge => codeById.get(edge.to))
+        .filter((code): code is string => Boolean(code));
+      return component;
+    });
+    setState({
+      ...local,
+      people: users.map(toPerson),
+      components,
+      repos: serverRepos.map(toRepo),
+      blockers: serverBlockers.map(toBlocker),
+      handoffs: [],
+      milestones: [],
+      history: [],
+      notices: [],
+      me: String(currentUser.id),
+    });
+  }, []);
+
+  const refreshApiGraph = useCallback(async () => {
+    const graph = await getGraph();
+    const codeById = new Map(graph.nodes.map(node => [node.id, node.code]));
+    edgeIndex.current = new Map(graph.edges.map(edge => [`${edge.from}:${edge.to}`, edge.id]));
+    setState(prev => ({
+      ...prev,
+      components: prev.components.map(component => ({
+        ...component,
+        deps: graph.edges
+          .filter(edge => edge.from === codeIndex.current.id(component.id))
+          .map(edge => codeById.get(edge.to))
+          .filter((code): code is string => Boolean(code)),
+      })),
+    }));
+  }, []);
+
+  const refreshApiBlockers = useCallback(async () => {
+    const blockers = await listBlockers();
+    setState(prev => ({ ...prev, blockers: blockers.map(toBlocker) }));
+  }, []);
+
+  const refreshApiComponent = useCallback(async (code: string) => {
+    const serverId = codeIndex.current.requireId(code);
+    const detail: ServerComponentDetail = await getComponent(serverId);
+    const component = toComponent(detail);
+    const library = libraryIndex.current.get(code);
+    component.lib = library?.lib ?? null;
+    component.projectId = library?.projectId ?? "";
+    component.purpose = library?.purpose ?? component.summary;
+    component.details = detail.docs_md ?? "";
+    component.deliverable = detail.acceptance_criteria ?? "";
+    component.links = Object.entries(detail.links ?? {}).map(([kind, url]) => ({
+      id: `${code}-${kind}`, kind: kind as ExtLink["kind"], label: kind, url, ref: url,
+    })).filter(link => ["github", "erpnext", "slack", "drive", "sheets"].includes(link.kind));
+    component.deps = detail.dependencies?.map(dependency => dependency.code) ?? [];
+    component.comments = (detail.comments ?? []).map(comment => ({
+      id: String(comment.id), body: comment.body, at: comment.created_at,
+      by: String(comment.author.id),
+    }));
+    const acceptance = detail.acceptances?.[0];
+    if (acceptance) {
+      component.gates.qa = {
+        state: acceptance.decision === "accepted" ? "accepted" : acceptance.decision,
+        at: acceptance.created_at, by: String(acceptance.reviewer.id), note: acceptance.evidence,
+      };
+    } else if (detail.review_requested) {
+      component.gates.qa = { state: "awaiting" };
+    }
+    component.gates.deploy = {
+      state: detail.status === "deployed" ? "deployed" : detail.gates.ready_for_deploy ? "ready" : "not_ready",
+    };
+    component.review = detail.review_requested ? "in_review" : "none";
+    const history = (detail.history ?? []).map(entry => ({
+      id: String(entry.id), entity: "component", entityId: code, action: entry.action,
+      to: entry.detail, by: entry.actor ? String(entry.actor.id) : "system",
+      at: entry.created_at, source: "apex",
+    } as HistoryEntry));
+    setState(prev => ({
+      ...prev,
+      components: prev.components.map(existing => existing.id === code ? component : existing),
+      history: [
+        ...history,
+        ...prev.history.filter(entry => entry.entity !== "component" || entry.entityId !== code),
+      ],
+    }));
+  }, []);
+
+  const runApiWrite = useCallback(async (code: string, operation: () => Promise<void>, refreshGraph = false) => {
+    try {
+      await operation();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        apiLogout();
+        setState(prev => ({ ...prev, me: null }));
+      }
+      try {
+        if (refreshGraph) await refreshApiGraph();
+        await refreshApiComponent(code);
+      } catch (refreshError) {
+        toast(`The write failed and the latest backend data could not be reloaded: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`, "warn");
+      }
+      toast(error instanceof Error ? error.message : "The backend write failed.", "crit");
+      return false;
+    }
+    try {
+      if (refreshGraph) await refreshApiGraph();
+      await refreshApiComponent(code);
+    } catch (error) {
+      toast(`Saved, but the latest backend data could not be reloaded: ${error instanceof Error ? error.message : "unknown error"}`, "warn");
+    }
+    return true;
+  }, [refreshApiComponent, refreshApiGraph, toast]);
+
+  const loadComponentDetail = useCallback(async (code: string) => {
+    if (!apiEnabled()) return;
+    try {
+      await refreshApiComponent(code);
+    } catch (error) {
+      toast(`Could not load component details: ${error instanceof Error ? error.message : "unknown backend error"}`, "crit");
+    }
+  }, [refreshApiComponent, toast]);
+
+  useEffect(() => {
+    if (!apiEnabled() || !getToken()) return;
+    setAuthLoading(true);
+    setAuthError(null);
+    hydrateApi().catch(error => {
+      if (error instanceof ApiError && error.status === 401) apiLogout();
+      setAuthError(error instanceof Error ? error.message : "Could not load data from the backend.");
+    }).finally(() => setAuthLoading(false));
+  }, [hydrateApi]);
+
   const mutate = useCallback((fn: (d: AppState) => void) => {
     setState(prev => { const d = structuredClone(prev); fn(d); return d; });
   }, []);
+
+  const authenticate = useCallback(async (email: string, password: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await apiLogin(email, password);
+      await hydrateApi();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) apiLogout();
+      const message = error instanceof Error ? error.message : "Could not sign in.";
+      setAuthError(message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [hydrateApi]);
 
   const pname = (d: AppState, id?: string | null) => personName(d.people.find(p => p.id === id));
   const log = (d: AppState, e: Omit<HistoryEntry, "id" | "at" | "by" | "source"> & { by?: string }) =>
@@ -60,11 +280,35 @@ function useProvideStore() {
   };
   const comp = (d: AppState, id: string) => d.components.find(c => c.id === id)!;
   const touch = (c: Component) => { c.updatedAt = nowIso(); };
+  const serverUserId = (id: string | null) => {
+    if (id === null) return null;
+    const parsed = Number(id);
+    if (!Number.isInteger(parsed) || parsed < 1) throw new ApiError(422, "This account cannot be assigned by the configured backend.");
+    return parsed;
+  };
+  const serverRepoId = (id: string | null) => {
+    if (id === null) return null;
+    const parsed = Number(id);
+    if (!Number.isInteger(parsed) || parsed < 1) throw new ApiError(422, "Select a repository loaded from the backend.");
+    return parsed;
+  };
 
   const actions = {
     // ── identity
-    signIn: (id: string) => mutate(d => { d.me = id; }),
-    signOut: () => mutate(d => { d.me = null; }),
+    signIn: (id: string) => {
+      if (apiEnabled()) return;
+      mutate(d => { d.me = id; });
+    },
+    signOut: () => {
+      if (apiEnabled()) {
+        apiLogout();
+        const fresh = seedState();
+        fresh.me = null;
+        setState(fresh);
+        return;
+      }
+      setState(prev => ({ ...prev, me: null }));
+    },
     register: (p: { first: string; last: string; email: string }) => {
       const id = uid("u");
       mutate(d => {
@@ -96,13 +340,103 @@ function useProvideStore() {
     }),
 
     // ── components
-    createComponent: (c: Component) => mutate(d => {
-      d.components.push(c);
-      log(d, { entity: "component", entityId: c.id, action: "Component created" });
-      if (c.ownerId) { log(d, { entity: "component", entityId: c.id, action: "Owner assigned", field: "owner", from: "Unassigned", to: c.ownerId }); notify(d, c.ownerId, "assignment", `You own ${c.name}`, "Your onboarding pack is ready on the component page.", c.id); }
-      if (c.reviewerId) notify(d, c.reviewerId, "review", `You are reviewer for ${c.name}`, `${c.id} · due ${c.due}`, c.id);
-    }),
-    updateComponent: (id: string, patch: Partial<Component>, reason?: string) => mutate(d => {
+    createComponent: async (c: Component): Promise<boolean> => {
+      if (apiEnabled()) {
+        let created: { id: number; code: string } | null = null;
+        try {
+          if (c.reviewerId || c.qaId) throw new ApiError(409, "Reviewer and QA assignments are not supported by the backend yet.");
+          const serverComponent = await postComponent({
+            code: c.id, name: c.name, category: c.category, layer: c.lib?.layer ?? c.category,
+            description: c.summary, spec_md: c.purpose, docs_md: c.details,
+            acceptance_criteria: c.deliverable, status: fromStatus(c.status),
+            priority: fromPriority(c.priority), due_date: c.due || null,
+            owner_id: serverUserId(c.ownerId), repo_id: serverRepoId(c.repoId),
+            links: Object.fromEntries(c.links.map(link => [link.kind, link.url])),
+          });
+          created = serverComponent;
+          codeIndex.current.add(serverComponent);
+          for (const dependency of c.deps) {
+            await postDependency(serverComponent.id, codeIndex.current.requireId(dependency));
+          }
+          await hydrateApi();
+          await refreshApiComponent(c.id);
+          return true;
+        } catch (error) {
+          let refreshError: unknown;
+          if (created) {
+            try { await hydrateApi(); } catch (failure) { refreshError = failure; }
+          }
+          if (error instanceof ApiError && error.status === 401) {
+            apiLogout();
+            setState(prev => ({ ...prev, me: null }));
+          }
+          toast(created
+            ? `Component ${c.id} was created, but a related step failed: ${error instanceof Error ? error.message : "unknown backend error"}${refreshError instanceof Error ? `; refreshing backend data also failed: ${refreshError.message}` : ""}`
+            : error instanceof Error ? error.message : "Could not create the component.", "crit");
+          return created !== null;
+        }
+      }
+      mutate(d => {
+        d.components.push(c);
+        log(d, { entity: "component", entityId: c.id, action: "Component created" });
+        if (c.ownerId) { log(d, { entity: "component", entityId: c.id, action: "Owner assigned", field: "owner", from: "Unassigned", to: c.ownerId }); notify(d, c.ownerId, "assignment", `You own ${c.name}`, "Your onboarding pack is ready on the component page.", c.id); }
+        if (c.reviewerId) notify(d, c.reviewerId, "review", `You are reviewer for ${c.name}`, `${c.id} · due ${c.due}`, c.id);
+      });
+      return true;
+    },
+    updateComponent: async (id: string, patch: Partial<Component>, reason?: string): Promise<boolean> => {
+      if (apiEnabled()) {
+        const current = state.components.find(component => component.id === id);
+        if (!current) {
+          toast(`Component ${id} is not loaded. Refresh and try again.`, "crit");
+          return false;
+        }
+        const supported = new Set<keyof Component>([
+          "name", "category", "summary", "purpose", "details", "ownerId",
+          "reviewerId", "qaId", "priority", "status", "due", "repoId", "deps", "deliverable",
+        ]);
+        const unsupported = (Object.keys(patch) as (keyof Component)[])
+          .filter(key => !supported.has(key) && JSON.stringify(current[key]) !== JSON.stringify(patch[key]));
+        if (unsupported.length) {
+          toast(`The backend cannot save these fields yet: ${unsupported.join(", ")}. No changes were made.`, "warn");
+          return false;
+        }
+        return runApiWrite(id, async () => {
+          const body: Record<string, unknown> = {};
+          if (patch.name !== undefined) body.name = patch.name;
+          if (patch.category !== undefined) { body.category = patch.category; body.layer = patch.category; }
+          if (patch.summary !== undefined) body.description = patch.summary;
+          if (patch.purpose !== undefined) body.spec_md = patch.purpose;
+          if (patch.details !== undefined) body.docs_md = patch.details;
+          if (patch.deliverable !== undefined) body.acceptance_criteria = patch.deliverable;
+          if (patch.ownerId !== undefined) body.owner_id = serverUserId(patch.ownerId);
+          if (patch.reviewerId !== undefined) body.reviewer_id = serverUserId(patch.reviewerId);
+          if (patch.qaId !== undefined) body.qa_id = serverUserId(patch.qaId);
+          if (patch.priority !== undefined) body.priority = fromPriority(patch.priority);
+          if (patch.status !== undefined) body.status = fromStatus(patch.status);
+          if (patch.due !== undefined) body.due_date = patch.due || null;
+          if (patch.repoId !== undefined) body.repo_id = serverRepoId(patch.repoId);
+          if (Object.keys(body).length) await patchComponent(codeIndex.current.requireId(id), body);
+          if (patch.deps !== undefined) {
+            const before = new Set(current.deps);
+            const after = new Set(patch.deps);
+            for (const dependency of before) {
+              if (!after.has(dependency)) {
+                const edgeId = edgeIndex.current.get(`${codeIndex.current.requireId(id)}:${codeIndex.current.requireId(dependency)}`);
+                if (edgeId === undefined) throw new ApiError(409, `Dependency edge ${id} → ${dependency} is not loaded.`);
+                await deleteServerDependency(edgeId);
+              }
+            }
+            for (const dependency of after) {
+              if (!before.has(dependency)) {
+                await postDependency(codeIndex.current.requireId(id), codeIndex.current.requireId(dependency));
+              }
+            }
+          }
+          if (reason?.trim()) toast("The backend does not store change reasons; the field updates were saved without that note.", "warn");
+        }, patch.deps !== undefined);
+      }
+      mutate(d => {
       const c = comp(d, id);
       for (const k of Object.keys(patch) as (keyof Component)[]) {
         const before = c[k] as any, after = patch[k] as any;
@@ -122,8 +456,30 @@ function useProvideStore() {
       if (patch.reviewerId && patch.reviewerId !== c.reviewerId) notify(d, patch.reviewerId, "review", `You are reviewer for ${c.name}`, `${c.id} · due ${c.due}`, id);
       if ((patch.due && patch.due !== c.due) || (patch.eta && patch.eta !== c.eta)) notify(d, c.ownerId, "deadline", `Plan changed for ${c.name}`, `Due ${patch.due || c.due} · ETA ${patch.eta || c.eta}`, id);
       Object.assign(c, patch); touch(c);
-    }),
-    deleteComponent: (id: string) => mutate(d => {
+      });
+      return true;
+    },
+    deleteComponent: async (id: string): Promise<boolean> => {
+      if (apiEnabled()) {
+        try {
+          await deleteServerComponent(codeIndex.current.requireId(id));
+          setState(prev => ({ ...prev, components: prev.components.filter(component => component.id !== id) }));
+          try {
+            await hydrateApi();
+          } catch (error) {
+            toast(`Component ${id} was deleted, but the latest backend data could not be reloaded: ${error instanceof Error ? error.message : "unknown error"}`, "warn");
+          }
+          return true;
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 401) {
+            apiLogout();
+            setState(prev => ({ ...prev, me: null }));
+          }
+          toast(error instanceof Error ? error.message : "Could not delete the component.", "crit");
+          return false;
+        }
+      }
+      mutate(d => {
       const c = comp(d, id);
       d.components = d.components.filter(x => x.id !== id);
       for (const x of d.components) x.deps = x.deps.filter(z => z !== id);
@@ -131,8 +487,14 @@ function useProvideStore() {
       d.handoffs = d.handoffs.filter(h => h.componentId !== id);
       for (const m of d.milestones) m.componentIds = m.componentIds.filter(z => z !== id);
       log(d, { entity: "component", entityId: id, action: `Deleted component ${id} ${c.name}` });
-    }),
-    submitForReview: (id: string) => mutate(d => {
+      });
+      return true;
+    },
+    submitForReview: async (id: string): Promise<boolean> => {
+      if (apiEnabled()) return runApiWrite(id, async () => {
+        await requestComponentReview(codeIndex.current.requireId(id));
+      });
+      mutate(d => {
       const c = comp(d, id);
       log(d, { entity: "component", entityId: id, action: "Submitted for review", field: "status", from: STATUS_LABEL[c.status], to: STATUS_LABEL.under_review });
       c.status = "under_review"; c.review = "in_review";
@@ -140,31 +502,71 @@ function useProvideStore() {
       notify(d, c.reviewerId, "review", `Review requested: ${c.name}`, `${pname(d, d.me)} submitted ${c.id} for review.`, id);
       notify(d, c.qaId, "review", `QA requested: ${c.name}`, "Ready for QA once required checks pass.", id);
       touch(c);
-    }),
-    setReview: (id: string, review: Component["review"], note?: string) => mutate(d => {
+      });
+      return true;
+    },
+    setReview: (id: string, review: Component["review"], note?: string) => {
+      if (apiEnabled()) {
+        toast("Code-review decisions are not supported by the backend yet. No changes were made.", "warn");
+        return false;
+      }
+      mutate(d => {
       const c = comp(d, id);
       log(d, { entity: "component", entityId: id, action: review === "accepted" ? "Code review accepted" : review === "changes_requested" ? "Code review: changes requested" : "Review started", reason: note });
       c.review = review;
       if (review === "changes_requested") { c.status = "in_progress"; notify(d, c.ownerId, "review", `Changes requested on ${c.name}`, note || "See the component page.", id); }
       if (review === "accepted") notify(d, c.ownerId, "review", `Review accepted: ${c.name}`, note || "", id);
       touch(c);
-    }),
-    setQA: (id: string, state: QAState, note?: string) => mutate(d => {
+      });
+      return true;
+    },
+    setQA: async (id: string, state: QAState, note?: string): Promise<boolean> => {
+      if (apiEnabled()) {
+        const decision = state === "accepted" ? "accepted" : state === "rejected" ? "rejected" : state === "changes_requested" ? "changes_requested" : null;
+        if (!decision) {
+          toast("The backend records QA decisions, not intermediate QA states. No changes were made.", "warn");
+          return false;
+        }
+        return runApiWrite(id, async () => {
+          await recordAcceptance(codeIndex.current.requireId(id), decision, note || "");
+        });
+      }
+      mutate(d => {
       const c = comp(d, id);
       log(d, { entity: "component", entityId: id, action: state === "accepted" ? "QA accepted" : state === "changes_requested" ? "QA changes requested" : state === "rejected" ? "QA rejected" : "QA started", field: "qa", from: c.gates.qa.state, to: state, reason: note });
       c.gates.qa = { state, by: d.me || undefined, at: nowIso(), note };
       if (state === "changes_requested" || state === "rejected") { c.status = "in_progress"; if (c.gates.deploy.state !== "deployed") c.gates.deploy = { state: "not_ready" }; }
       notify(d, c.ownerId, "review", state === "accepted" ? `QA accepted ${c.name}` : `QA update on ${c.name}`, note || state.replace(/_/g, " "), id);
       touch(c);
-    }),
-    setDeploy: (id: string, state: DeployState, note?: string) => mutate(d => {
+      });
+      return true;
+    },
+    setDeploy: async (id: string, state: DeployState, note?: string): Promise<boolean> => {
+      if (apiEnabled()) {
+        if (state !== "ready" && state !== "not_ready" && state !== "deployed") {
+          toast("The backend does not support this deployment transition yet. No changes were made.", "warn");
+          return false;
+        }
+        return runApiWrite(id, async () => {
+          const serverId = codeIndex.current.requireId(id);
+          if (state === "deployed") {
+            await patchComponent(serverId, { status: "deployed" });
+          } else {
+            await setComponentGate(serverId, "ready_for_deploy", state === "ready");
+          }
+          if (note?.trim()) toast("The deployment change was saved, but its note is not stored by the backend.", "warn");
+        });
+      }
+      mutate(d => {
       const c = comp(d, id);
       log(d, { entity: "component", entityId: id, action: state === "ready" ? "Approved for deployment" : state === "deployed" ? "Deployed" : `Deployment: ${state.replace(/_/g, " ")}`, field: "deploy", from: c.gates.deploy.state, to: state, reason: note });
       c.gates.deploy = { state, by: d.me || undefined, at: nowIso(), note };
       if (state === "deployed" && c.status !== "completed") { c.status = "completed"; log(d, { entity: "component", entityId: id, action: "Status changed", field: "status", from: "Under review", to: "Completed" }); }
       notify(d, c.ownerId, "review", state === "ready" ? `${c.name} approved for deployment` : `Deployment update: ${c.name}`, note || "", id);
       touch(c);
-    }),
+      });
+      return true;
+    },
 
     // ── acceptance criteria & evidence
     addCriterion: (id: string, k: Omit<Criterion, "id" | "status" | "evidence">) => mutate(d => {
@@ -199,19 +601,54 @@ function useProvideStore() {
     }),
 
     // ── comments
-    addComment: (id: string, body: string) => mutate(d => {
+    addComment: (id: string, body: string) => {
+      if (apiEnabled()) return runApiWrite(id, async () => {
+        await postComment(codeIndex.current.requireId(id), body);
+      });
+      mutate(d => {
       const c = comp(d, id);
       c.comments.push({ id: uid("cm"), by: d.me!, at: nowIso(), body });
       const who = pname(d, d.me);
       new Set([c.ownerId, c.reviewerId]).forEach(to => notify(d, to, "comment", `${who} commented on ${c.name}`, body.slice(0, 120), id));
       for (const p of d.people) if (body.toLowerCase().includes("@" + p.first.toLowerCase())) notify(d, p.id, "comment", `${who} mentioned you`, body.slice(0, 120), id);
-    }),
+      });
+      return true;
+    },
     editComment: (id: string, cid: string, body: string) => mutate(d => { const k = comp(d, id).comments.find(x => x.id === cid)!; k.body = body; k.edited = true; }),
     deleteComment: (id: string, cid: string) => mutate(d => { const c = comp(d, id); c.comments = c.comments.filter(x => x.id !== cid); }),
 
     // ── links & architecture
-    addLink: (id: string, l: Omit<ExtLink, "id">) => mutate(d => { comp(d, id).links.push({ ...l, id: uid("ln") }); log(d, { entity: "component", entityId: id, action: `Linked ${l.kind} record`, to: l.label }); }),
-    removeLink: (id: string, lid: string) => mutate(d => { const c = comp(d, id); const l = c.links.find(x => x.id === lid)!; c.links = c.links.filter(x => x.id !== lid); log(d, { entity: "component", entityId: id, action: `Unlinked ${l.kind} record`, from: l.label }); }),
+    addLink: async (id: string, l: Omit<ExtLink, "id">): Promise<boolean> => {
+      if (apiEnabled()) {
+        const current = state.components.find(component => component.id === id);
+        if (!current) { toast(`Component ${id} is not loaded. Refresh and try again.`, "crit"); return false; }
+        if (current.links.some(link => link.kind === l.kind)) {
+          toast(`The backend supports one link per system. Remove the existing ${l.kind} link first.`, "warn");
+          return false;
+        }
+        return runApiWrite(id, async () => {
+          await patchComponent(codeIndex.current.requireId(id), {
+            links: Object.fromEntries([...current.links, l].map(link => [link.kind, link.url])),
+          });
+        });
+      }
+      mutate(d => { comp(d, id).links.push({ ...l, id: uid("ln") }); log(d, { entity: "component", entityId: id, action: `Linked ${l.kind} record`, to: l.label }); });
+      return true;
+    },
+    removeLink: async (id: string, lid: string): Promise<boolean> => {
+      if (apiEnabled()) {
+        const current = state.components.find(component => component.id === id);
+        const link = current?.links.find(item => item.id === lid);
+        if (!current || !link) { toast("That link is no longer available. Refresh and try again.", "crit"); return false; }
+        return runApiWrite(id, async () => {
+          await patchComponent(codeIndex.current.requireId(id), {
+            links: Object.fromEntries(current.links.filter(item => item.id !== lid).map(item => [item.kind, item.url])),
+          });
+        });
+      }
+      mutate(d => { const c = comp(d, id); const l = c.links.find(x => x.id === lid)!; c.links = c.links.filter(x => x.id !== lid); log(d, { entity: "component", entityId: id, action: `Unlinked ${l.kind} record`, from: l.label }); });
+      return true;
+    },
     addArch: (id: string, f: Omit<ArchFile, "id" | "by" | "at" | "version">) => mutate(d => {
       const c = comp(d, id); const prev = c.architecture.filter(a => a.name === f.name).length;
       c.architecture.unshift({ ...f, id: uid("af"), by: d.me!, at: nowIso(), version: prev + 1 });
@@ -220,16 +657,58 @@ function useProvideStore() {
     removeArch: (id: string, aid: string) => mutate(d => { const c = comp(d, id); const a = c.architecture.find(x => x.id === aid)!; c.architecture = c.architecture.filter(x => x.id !== aid); log(d, { entity: "component", entityId: id, action: "Architecture file removed", from: a.name }); }),
 
     // ── blockers & handoffs
-    addBlocker: (b: Omit<Blocker, "id" | "createdAt" | "updatedAt" | "reportedBy" | "status">) => mutate(d => {
-      const num = Math.max(...d.blockers.map(x => parseInt(x.id.slice(4))), 0) + 1;
-      const id = `BLK-${String(num).padStart(3, "0")}`;
-      d.blockers.unshift({ ...b, id, status: "open", reportedBy: d.me!, createdAt: nowIso(), updatedAt: nowIso() });
-      const c = comp(d, b.componentId);
-      log(d, { entity: "component", entityId: b.componentId, action: `Blocker ${id} raised`, to: b.title });
-      notify(d, b.responsibleId, "blocker", "Blocker assigned to you", `${id} ${b.title}`, b.componentId);
-      notify(d, c.ownerId, "blocker", `New blocker on ${c.name}`, `${id} ${b.title}`, b.componentId);
-    }),
-    updateBlocker: (id: string, patch: Partial<Blocker>, note?: string) => mutate(d => {
+    addBlocker: async (b: Omit<Blocker, "id" | "createdAt" | "updatedAt" | "reportedBy" | "status">): Promise<boolean> => {
+      if (apiEnabled()) {
+        const saved = await runApiWrite(b.componentId, async () => {
+          await addServerBlocker(codeIndex.current.requireId(b.componentId), {
+            title: b.title, description: b.description, category: b.category,
+            severity: b.severity, responsible_id: serverUserId(b.responsibleId),
+            next_action: b.nextAction, target_date: b.target || null, slack: b.slack || null,
+          });
+        });
+        if (saved) {
+          try { await refreshApiBlockers(); }
+          catch (error) { toast(`Blocker saved, but the blocker list could not be refreshed: ${error instanceof Error ? error.message : "unknown error"}`, "warn"); }
+        }
+        return saved;
+      }
+      mutate(d => {
+        const num = Math.max(...d.blockers.map(x => parseInt(x.id.slice(4))), 0) + 1;
+        const id = `BLK-${String(num).padStart(3, "0")}`;
+        d.blockers.unshift({ ...b, id, status: "open", reportedBy: d.me!, createdAt: nowIso(), updatedAt: nowIso() });
+        const c = comp(d, b.componentId);
+        log(d, { entity: "component", entityId: b.componentId, action: `Blocker ${id} raised`, to: b.title });
+        notify(d, b.responsibleId, "blocker", "Blocker assigned to you", `${id} ${b.title}`, b.componentId);
+        notify(d, c.ownerId, "blocker", `New blocker on ${c.name}`, `${id} ${b.title}`, b.componentId);
+      });
+      return true;
+    },
+    updateBlocker: async (id: string, patch: Partial<Blocker>, note?: string): Promise<boolean> => {
+      if (apiEnabled()) {
+        if (patch.status !== "resolved" && patch.status !== "closed") {
+          toast("The backend currently supports resolving blockers, but not reopening or editing them.", "warn");
+          return false;
+        }
+        const blocker = state.blockers.find(item => item.id === id);
+        if (!blocker) {
+          toast(`Blocker ${id} is not loaded. Refresh and try again.`, "crit");
+          return false;
+        }
+        const match = /^BLK-(\d+)$/.exec(id);
+        if (!match) {
+          toast(`Blocker ${id} has an invalid backend identifier.`, "crit");
+          return false;
+        }
+        const saved = await runApiWrite(blocker.componentId, async () => {
+          await resolveServerBlocker(Number(match[1]));
+        });
+        if (saved) {
+          try { await refreshApiBlockers(); }
+          catch (error) { toast(`Blocker resolved, but the blocker list could not be refreshed: ${error instanceof Error ? error.message : "unknown error"}`, "warn"); }
+        }
+        return saved;
+      }
+      mutate(d => {
       const b = d.blockers.find(x => x.id === id)!;
       if (patch.status && patch.status !== b.status) {
         log(d, { entity: "component", entityId: b.componentId, action: `Blocker ${id} ${patch.status === "resolved" ? "resolved" : patch.status === "escalated" ? "escalated" : "updated"}`, field: "blocker", from: b.status.replace(/_/g, " "), to: patch.status.replace(/_/g, " "), reason: note });
@@ -240,7 +719,9 @@ function useProvideStore() {
       if (patch.responsibleId && patch.responsibleId !== b.responsibleId) notify(d, patch.responsibleId, "blocker", "Blocker assigned to you", `${id} ${b.title}`, b.componentId);
       if (patch.target && patch.target !== b.target) log(d, { entity: "component", entityId: b.componentId, action: `Blocker ${id} target changed`, from: b.target, to: patch.target });
       Object.assign(b, patch, { updatedAt: nowIso() });
-    }),
+      });
+      return true;
+    },
     startHandoff: (h: Omit<Handoff, "id" | "status" | "createdAt" | "by">) => mutate(d => {
       const num = Math.max(...d.handoffs.map(x => parseInt(x.id.slice(3))), 0) + 1;
       const id = `HO-${String(num).padStart(3, "0")}`;
@@ -302,8 +783,22 @@ function useProvideStore() {
     // ── graph
     setPos: (id: string, x: number, y: number) => mutate(d => { d.graphPos[id] = { x, y }; }),
     resetPos: () => mutate(d => { d.graphPos = {}; }),
-    addDep: (from: string, to: string) => mutate(d => { const c = comp(d, from); if (!c.deps.includes(to)) { log(d, { entity: "component", entityId: from, action: "Dependency added", to: `${to} ${comp(d, to).name}` }); c.deps.push(to); touch(c); } }),
-    removeDep: (from: string, to: string) => mutate(d => { const c = comp(d, from); c.deps = c.deps.filter(x => x !== to); log(d, { entity: "component", entityId: from, action: "Dependency removed", from: `${to} ${comp(d, to).name}` }); touch(c); }),
+    addDep: async (from: string, to: string): Promise<boolean> => {
+      if (apiEnabled()) return runApiWrite(from, async () => {
+        await postDependency(codeIndex.current.requireId(from), codeIndex.current.requireId(to));
+      }, true);
+      mutate(d => { const c = comp(d, from); if (!c.deps.includes(to)) { log(d, { entity: "component", entityId: from, action: "Dependency added", to: `${to} ${comp(d, to).name}` }); c.deps.push(to); touch(c); } });
+      return true;
+    },
+    removeDep: async (from: string, to: string): Promise<boolean> => {
+      if (apiEnabled()) return runApiWrite(from, async () => {
+        const edgeId = edgeIndex.current.get(`${codeIndex.current.requireId(from)}:${codeIndex.current.requireId(to)}`);
+        if (edgeId === undefined) throw new ApiError(404, `Dependency edge ${from} → ${to} was not found.`);
+        await deleteServerDependency(edgeId);
+      }, true);
+      mutate(d => { const c = comp(d, from); c.deps = c.deps.filter(x => x !== to); log(d, { entity: "component", entityId: from, action: "Dependency removed", from: `${to} ${comp(d, to).name}` }); touch(c); });
+      return true;
+    },
 
     // ── notifications
     markRead: (id: string) => mutate(d => { const x = d.notices.find(n => n.id === id); if (x) x.read = true; }),
@@ -316,7 +811,7 @@ function useProvideStore() {
   const isAdmin = me?.role === "admin";
   const person = (id?: string | null) => state.people.find(p => p.id === id) || null;
   const component = (id?: string | null) => state.components.find(c => c.id === id) || null;
-  return { state, me, isAdmin, person, component, saveError, ...actions };
+  return { state, me, isAdmin, person, component, saveError, apiMode: apiEnabled(), authLoading, authError, authenticate, loadComponentDetail, ...actions };
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {

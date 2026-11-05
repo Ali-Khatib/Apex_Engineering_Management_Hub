@@ -15,17 +15,13 @@ moving `status` onto the new development vocabulary is a separate, reviewed
 data migration that is deliberately not performed here. The mapping is written
 out in docs/status-vocabulary.md.
 
-NOT EXECUTED. Alembic cannot be installed in this environment (PyPI is
-unreachable) and no database exists to run it against. See docs/migrations.md
-before running it anywhere.
-
-Revision ID: 0002_provenance_and_approval_state
+Revision ID: 0002_provenance_approval
 Revises: 0001_baseline
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0002_provenance_and_approval_state"
+revision = "0002_provenance_approval"
 down_revision = "0001_baseline"
 branch_labels = None
 depends_on = None
@@ -55,56 +51,40 @@ def upgrade() -> None:
          WHERE approval_state IS NULL
         """
     )
-    op.alter_column(
-        "components",
-        "approval_state",
-        existing_type=sa.String(20),
-        nullable=False,
-        server_default="proposed",
-    )
+    with op.batch_alter_table("components") as batch_op:
+        batch_op.alter_column(
+            "approval_state",
+            existing_type=sa.String(20),
+            nullable=False,
+        )
     op.create_index("ix_components_approval_state", "components", ["approval_state"])
-
-    # ---- Decision 1 --------------------------------------------------------
-    # The code is the identity every URL and document uses, so the database
-    # should refuse a component without one.
-    op.alter_column(
-        "components",
-        "code",
-        existing_type=sa.String(40),
-        nullable=False,
-    )
 
     # ---- Decision 3 --------------------------------------------------------
     op.create_table(
         "component_provenance",
         sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
         sa.Column("code", sa.String(40), nullable=False),
-        sa.Column("namespace", sa.String(40), nullable=False, server_default=""),
-        sa.Column("group", sa.String(120), nullable=False, server_default=""),
-        sa.Column("layer", sa.String(120), nullable=False, server_default=""),
-        sa.Column("wave", sa.String(40), nullable=False, server_default=""),
-        sa.Column("sps", sa.JSON(), nullable=True),
-        sa.Column("source", sa.String(80), nullable=False, server_default=""),
-        sa.Column("source_url", sa.String(600), nullable=False, server_default=""),
-        sa.Column("mapping", sa.Text(), nullable=False, server_default=""),
-        sa.Column("overlap", sa.Text(), nullable=False, server_default=""),
-        sa.Column("folder", sa.String(300), nullable=False, server_default=""),
-        sa.Column("diagrams", sa.JSON(), nullable=True),
-        sa.Column("users", sa.Text(), nullable=False, server_default=""),
-        sa.Column("op", sa.Text(), nullable=False, server_default=""),
-        sa.Column("inputs", sa.JSON(), nullable=True),
-        sa.Column("outputs", sa.JSON(), nullable=True),
-        sa.Column("entities", sa.JSON(), nullable=True),
-        sa.Column("trigger", sa.Text(), nullable=False, server_default=""),
-        sa.Column("constraints", sa.Text(), nullable=False, server_default=""),
-        sa.Column("metric", sa.Text(), nullable=False, server_default=""),
-        sa.Column("test", sa.Text(), nullable=False, server_default=""),
-        sa.Column(
-            "library_state",
-            sa.String(80),
-            nullable=False,
-            server_default="Design proposal - architecture review required",
-        ),
+        sa.Column("namespace", sa.String(40), nullable=False),
+        sa.Column("group", sa.String(120), nullable=False),
+        sa.Column("layer", sa.String(120), nullable=False),
+        sa.Column("wave", sa.String(40), nullable=False),
+        sa.Column("sps", sa.JSON(), nullable=False),
+        sa.Column("source", sa.String(80), nullable=False),
+        sa.Column("source_url", sa.String(600), nullable=False),
+        sa.Column("mapping", sa.Text(), nullable=False),
+        sa.Column("overlap", sa.Text(), nullable=False),
+        sa.Column("folder", sa.String(300), nullable=False),
+        sa.Column("diagrams", sa.JSON(), nullable=False),
+        sa.Column("users", sa.Text(), nullable=False),
+        sa.Column("op", sa.Text(), nullable=False),
+        sa.Column("inputs", sa.JSON(), nullable=False),
+        sa.Column("outputs", sa.JSON(), nullable=False),
+        sa.Column("entities", sa.JSON(), nullable=False),
+        sa.Column("trigger", sa.Text(), nullable=False),
+        sa.Column("constraints", sa.Text(), nullable=False),
+        sa.Column("metric", sa.Text(), nullable=False),
+        sa.Column("test", sa.Text(), nullable=False),
+        sa.Column("library_state", sa.String(80), nullable=False),
         sa.Column("imported_at", sa.DateTime(), nullable=False),
     )
     # Unique on code, not a foreign key to components.id: a library entry can
@@ -113,6 +93,7 @@ def upgrade() -> None:
     op.create_index(
         "ix_component_provenance_code", "component_provenance", ["code"], unique=True
     )
+    op.create_index("ix_component_provenance_wave", "component_provenance", ["wave"])
 
 
 def downgrade() -> None:
@@ -122,14 +103,10 @@ def downgrade() -> None:
     That is recoverable only from src/data/library.json, which is the source of
     truth for it and is in version control. Re-import after downgrading.
     """
+    op.drop_index("ix_component_provenance_wave", table_name="component_provenance")
     op.drop_index("ix_component_provenance_code", table_name="component_provenance")
     op.drop_table("component_provenance")
 
-    op.alter_column(
-        "components",
-        "code",
-        existing_type=sa.String(40),
-        nullable=True,
-    )
     op.drop_index("ix_components_approval_state", table_name="components")
-    op.drop_column("components", "approval_state")
+    with op.batch_alter_table("components") as batch_op:
+        batch_op.drop_column("approval_state")

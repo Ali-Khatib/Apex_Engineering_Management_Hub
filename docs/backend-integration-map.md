@@ -51,14 +51,15 @@ inferred. All require `Authorization: Bearer <jwt>` except `/auth/login` and
 | GET | `/components` | — | list, `component_out` |
 | POST | `/components` | yes | `CompIn` |
 | GET | `/components/{cid}` | — | `component_out(detail=True)` |
-| PATCH | `/components/{cid}` | — | `CompPatch` |
+| PATCH | `/components/{cid}` | — | `CompPatch`, including reviewer/QA assignments |
 | DELETE | `/components/{cid}` | yes | |
 | POST | `/components/{cid}/comments` | — | `{body, parent_id?}` |
 | POST | `/components/{cid}/acceptances` | — | `{decision, evidence, evidence_url}` |
 | POST | `/components/{cid}/gates` | — | `{gate: str, value: bool}` |
 | POST | `/components/{cid}/request-review` | — | |
-| POST | `/components/{cid}/blockers` | — | `{description}` **only** |
-| POST | `/blockers/{bid}/resolve` | — | |
+| GET | `/blockers` | — | authenticated blocker list |
+| POST | `/components/{cid}/blockers` | — | blocker title, details, category, severity, responsible person, next action, date, and Slack reference |
+| POST | `/blockers/{bid}/resolve` | — | owner or admin resolves |
 | POST | `/components/{cid}/checklist` | — | `{text}` |
 | POST | `/checklist/{iid}/toggle` | — | |
 | GET | `/graph` | — | `{cycles, nodes, edges}` |
@@ -140,9 +141,11 @@ support exists and it must be written.
 
 ### 2.5 Assignments
 - **Ours:** owner, reviewer, QA contact, with a handoff when the owner changes.
-- **Backend:** `owner_id` on the component. **No `reviewer_id`, no `qa_id`.**
-- **MISSING:** reviewer and QA assignment, and every handoff record — no model,
-  no endpoint, no acknowledgement. Phase 5.6 requires them.
+- **Backend:** `owner_id`, `reviewer_id`, and `qa_id` on the component. Review
+  requests notify the assigned reviewer; QA decisions are restricted to the
+  assigned QA contact or an admin when a QA contact is set.
+- **MISSING:** handoff records and acknowledgement. Reassignment history is
+  not yet persisted as a handoff workflow.
 
 ### 2.6 Dependencies
 - **Backend:** `GET /graph` → `{cycles, nodes, edges}`; Tarjan at `api.py:284`;
@@ -172,12 +175,14 @@ support exists and it must be written.
   5.5 explicitly requires per-criterion evidence; the backend cannot express it.
 
 ### 2.9 Blockers and handoffs
-- **Backend `Blocker`:** `description`, `raised_by_id`, `resolved`,
-  `created_at`, `resolved_at`. `BlockerIn` accepts **one field**.
+- **Backend `Blocker`:** title, description, category, severity, responsible
+  user, next action, target date, Slack reference, reporter, and resolved
+  timestamps. `GET /blockers`, create, and resolve are connected to the UI.
 - **Ours:** title, description, category, severity, responsible person,
   reported by, next action, target date, and a 7-value status.
-- **MISSING:** severity, responsible, next action, target date, status enum —
-  five of the six fields Phase 5.6 names. **Handoffs do not exist at all.**
+- **MISSING:** a multi-state blocker lifecycle and blocker edit/reopen
+  endpoints. Existing records remain readable when optional structured fields
+  are absent. **Handoffs do not exist at all.**
 
 ### 2.10 Repositories and GitHub
 - **Backend:** repo registry, `POST /repos/{rid}/sync` (REST pull),
@@ -219,13 +224,10 @@ GitHub normaliser; JWT + PBKDF2 auth; the SSE event stream.
 → id adapter and the vocabulary map); `/graph` edges (we keep our own
 analysis); KB pages (after the lifecycle fields are added).
 
-**Missing backend capabilities (11):** library provenance (`LibInfo`);
-reviewer and QA assignment; handoff records with acknowledgement; per-criterion
-acceptance criteria and evidence; blocker severity / responsible / next action /
-target date / status; gate state machines with actor and timestamp; cycle
-decision records; notification kinds and preferences; practice review
-lifecycle; user profile fields (skills, team, active); **any migration
-framework at all**.
+**Remaining backend gaps:** handoff records with acknowledgement; per-criterion
+acceptance evidence; gate state machines with actor and timestamp; cycle
+decision records; notification preferences; practice review lifecycle; richer
+user profile fields; and blocker lifecycle edits beyond resolve.
 
 **Frontend unchanged (all of it).** No page, component, token or interaction
 needs replacing. The work is a service layer plus adapters behind the existing

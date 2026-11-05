@@ -19,11 +19,12 @@
  */
 import type { Component, Person, Priority, Status } from "./types";
 
-const BASE: string = (import.meta as any).env?.VITE_API_URL ?? "";
+const API_URL: string = (import.meta as any).env?.VITE_API_URL ?? "";
+const BASE = API_URL === "." ? "" : API_URL.replace(/\/$/, "");
 const TOKEN_KEY = "apex_token";
 
 /** True when a backend is configured. Everything else here assumes it. */
-export const apiEnabled = () => BASE.length > 0;
+export const apiEnabled = () => API_URL.length > 0;
 
 export const getToken = (): string | null => {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
@@ -89,10 +90,15 @@ export interface ServerUser {
   id: number; first_name: string; last_name: string; email: string;
   role: "admin" | "member"; title: string; onboarding_notes: string;
 }
+export interface ServerRepo {
+  id: number; full_name: string; url: string; description: string;
+  default_branch: string; last_synced: string | null; ci?: string | null;
+}
 export interface ServerComponent {
   id: number; code: string; name: string; category: string; layer: string;
   status: string; approval_state?: string; priority: string;
   due_date: string | null; owner: ServerUser | null;
+  reviewer: ServerUser | null; qa: ServerUser | null;
   repo: { id: number; full_name: string; url: string } | null;
   milestone_id: number | null; open_blockers: number; at_risk: boolean;
   unassigned: boolean; review_requested: boolean;
@@ -100,6 +106,27 @@ export interface ServerComponent {
   ready_for_review: boolean; description: string;
   spec_md?: string; docs_md?: string; architecture_md?: string;
   acceptance_criteria?: string; links?: Record<string, string>; updated_at?: string;
+}
+export interface ServerComment {
+  id: number; body: string; created_at: string; author: ServerUser;
+}
+export interface ServerAcceptance {
+  id: number; decision: "accepted" | "rejected" | "changes_requested";
+  evidence: string; evidence_url: string; created_at: string; reviewer: ServerUser;
+}
+export interface ServerComponentDetail extends ServerComponent {
+  dependencies?: { id: number; code: string; name: string; status: string }[];
+  comments?: ServerComment[];
+  acceptances?: ServerAcceptance[];
+  history?: { id: number; action: string; detail: string; created_at: string; actor: ServerUser | null }[];
+  blockers?: ServerBlocker[];
+}
+export interface ServerBlocker {
+  id: number; component_id: number; component_code: string;
+  title: string | null; description: string; category: string | null;
+  severity: string | null; responsible_id: number | null; raised_by: ServerUser | null;
+  next_action: string | null; target_date: string | null; slack: string | null;
+  resolved: boolean; created_at: string; resolved_at: string | null;
 }
 /** The sidecar from migration 0002. Keyed by code, never rewritten by the app. */
 export interface ServerProvenance {
@@ -127,13 +154,21 @@ const STATUS_IN: Record<string, Status> = {
   done: "completed", completed: "completed", deployed: "completed",
 };
 const STATUS_OUT: Record<Status, string> = {
-  not_started: "not_started", in_progress: "in_progress", blocked: "blocked",
-  under_review: "in_review", completed: "completed",
+  not_started: "proposed", in_progress: "in_progress", blocked: "blocked",
+  under_review: "in_review", completed: "done",
 };
 
-export const toPriority = (p: string): Priority => PRIORITY_IN[p] ?? "medium";
+export const toPriority = (p: string): Priority => {
+  const priority = PRIORITY_IN[p];
+  if (!priority) throw new ApiError(502, `Unsupported backend priority: ${p}`);
+  return priority;
+};
 export const fromPriority = (p: Priority): string => PRIORITY_OUT[p];
-export const toStatus = (s: string): Status => STATUS_IN[s] ?? "not_started";
+export const toStatus = (s: string): Status => {
+  const status = STATUS_IN[s];
+  if (!status) throw new ApiError(502, `Unsupported backend status: ${s}`);
+  return status;
+};
 export const fromStatus = (s: Status): string => STATUS_OUT[s];
 
 /**
@@ -147,6 +182,11 @@ export class CodeIndex {
   load(components: { id: number; code: string }[]) {
     this.byCode.clear(); this.byId.clear();
     for (const c of components) { this.byCode.set(c.code, c.id); this.byId.set(c.id, c.code); }
+    return this;
+  }
+  add(component: { id: number; code: string }) {
+    this.byCode.set(component.code, component.id);
+    this.byId.set(component.id, component.code);
     return this;
   }
   id(code: string): number | undefined { return this.byCode.get(code); }
@@ -173,8 +213,8 @@ export const toPerson = (u: ServerUser): Person => ({
  * One server component plus its provenance row becomes one of ours.
  *
  * Fields the backend does not carry are left empty rather than filled with a
- * plausible value: reviewer, QA contact, start and ETA dates, acceptance
- * criteria as structured records, and the gate state machines. The three gates
+ * plausible value: start and ETA dates, acceptance criteria as structured
+ * records, and the gate state machines. The three gates
  * arrive as booleans, so a true maps to the settled state and a false to the
  * unstarted one. That loses the actor and the timestamp, which the backend
  * does not record.
@@ -190,8 +230,8 @@ export function toComponent(c: ServerComponent, prov?: ServerProvenance): Compon
     deliverable: "",
     details: c.docs_md ?? "",
     ownerId: c.owner ? String(c.owner.id) : null,
-    reviewerId: null,                 // no column on the server
-    qaId: null,                       // no column on the server
+    reviewerId: c.reviewer ? String(c.reviewer.id) : null,
+    qaId: c.qa ? String(c.qa.id) : null,
     priority: toPriority(c.priority),
     status: toStatus(c.status),
     review: c.review_requested ? "in_review" : "none",
@@ -225,10 +265,32 @@ export function toComponent(c: ServerComponent, prov?: ServerProvenance): Compon
 // Only routes confirmed to exist in backend/app/api.py.
 
 export const listComponents = () => api<ServerComponent[]>("/components");
-export const getComponent = (id: number) => api<ServerComponent>(`/components/${id}`);
+export const getComponent = (id: number) => api<ServerComponentDetail>(`/components/${id}`);
 export const patchComponent = (id: number, patch: Record<string, unknown>) =>
   api<ServerComponent>(`/components/${id}`, { method: "PATCH", body: patch });
+export const createComponent = (body: Record<string, unknown>) =>
+  api<ServerComponent>("/components", { method: "POST", body });
+export const deleteComponent = (id: number) =>
+  api<null>(`/components/${id}`, { method: "DELETE" });
+export const addDependency = (component_id: number, depends_on_id: number) =>
+  api<{ id: number }>("/dependencies", { method: "POST", body: { component_id, depends_on_id } });
+export const deleteDependency = (id: number) =>
+  api<null>(`/dependencies/${id}`, { method: "DELETE" });
+export const addComponentComment = (id: number, body: string) =>
+  api<ServerComment>(`/components/${id}/comments`, { method: "POST", body: { body } });
+export const requestComponentReview = (id: number) =>
+  api<{ ok: boolean }>(`/components/${id}/request-review`, { method: "POST" });
+export const recordAcceptance = (id: number, decision: ServerAcceptance["decision"], evidence: string) =>
+  api<ServerAcceptance>(`/components/${id}/acceptances`, { method: "POST", body: { decision, evidence } });
+export const setComponentGate = (id: number, gate: "checks_passed" | "ready_for_deploy", value: boolean) =>
+  api<Record<string, boolean>>(`/components/${id}/gates`, { method: "POST", body: { gate, value } });
 export const listUsers = () => api<ServerUser[]>("/users");
+export const listBlockers = () => api<ServerBlocker[]>("/blockers");
+export const addServerBlocker = (id: number, body: Record<string, unknown>) =>
+  api<ServerBlocker>(`/components/${id}/blockers`, { method: "POST", body });
+export const resolveServerBlocker = (id: number) =>
+  api<{ ok: boolean }>(`/blockers/${id}/resolve`, { method: "POST" });
+export const listRepositories = () => api<ServerRepo[]>("/repos");
 export const getPortfolio = () => api<Record<string, unknown>>("/portfolio");
 export const getGraph = () =>
   api<{ cycles: number[][]; nodes: { id: number; code: string }[]; edges: { id: number; from: number; to: number }[] }>("/graph");

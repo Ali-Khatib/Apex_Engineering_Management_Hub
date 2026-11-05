@@ -60,6 +60,8 @@ class Component(Base):
     priority: Mapped[str] = mapped_column(String(20), default="P2")  # P0..P3
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    qa_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     repo_id: Mapped[int | None] = mapped_column(ForeignKey("repositories.id"), nullable=True)
     milestone_id: Mapped[int | None] = mapped_column(ForeignKey("milestones.id"), nullable=True)
     # readiness gates are independent from each other and from GitHub CI
@@ -70,7 +72,9 @@ class Component(Base):
     links: Mapped[dict] = mapped_column(JSON, default=dict)  # github, erpnext, slack, drive, sheets
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
-    owner = relationship("User", lazy="joined")
+    owner = relationship("User", foreign_keys=[owner_id], lazy="joined")
+    reviewer = relationship("User", foreign_keys=[reviewer_id], lazy="joined")
+    qa = relationship("User", foreign_keys=[qa_id], lazy="joined")
     repo = relationship("Repository", lazy="joined")
 
 class Dependency(Base):
@@ -113,11 +117,20 @@ class Blocker(Base):
     __tablename__ = "blockers"
     id: Mapped[int] = mapped_column(primary_key=True)
     component_id: Mapped[int] = mapped_column(ForeignKey("components.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
     description: Mapped[str] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    severity: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    responsible_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    next_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    slack: Mapped[str | None] = mapped_column(String(400), nullable=True)
     raised_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    component = relationship("Component", lazy="joined")
+    raised_by = relationship("User", foreign_keys=[raised_by_id], lazy="joined")
 
 class ChecklistItem(Base):
     __tablename__ = "checklist_items"

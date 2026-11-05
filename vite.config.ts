@@ -3,7 +3,16 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173, open: true },
+  server: {
+    port: 5173,
+    open: true,
+    // With VITE_API_URL=. the app calls /api on its own origin. In development
+    // the backend runs separately on 8000, so forward those calls to it.
+    proxy: {
+      "/api": "http://localhost:8000",
+      "/diagrams": "http://localhost:8000",
+    },
+  },
   build: {
     rollupOptions: {
       output: {

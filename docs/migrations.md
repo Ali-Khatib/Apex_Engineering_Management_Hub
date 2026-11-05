@@ -1,50 +1,55 @@
 # Migrations and rollback
 
 Branch: `feature/apex-backend-integration`
-Status: **written, not executed.** Read §1 before trusting anything here.
+Status: **SQLite cycle and ORM drift verified; PostgreSQL and production are
+not verified.** Read §1 before applying this to an existing database.
 
 ---
 
-## 1. What could not be done, and why
+## 1. Verification status
 
-Three of the steps requested for Step 1 have no object in this environment.
-Saying so is the point; a migration reported as tested when it was not is worse
-than no migration.
-
-| Step | Status |
+| Check | Status |
 |---|---|
-| Inspect the current database and schema | **Nothing to inspect.** No application database exists. No Postgres server, no cluster in `/var/lib/postgresql`, no Docker daemon, nothing listening on 5432, `DATABASE_URL` unset, and no SQLite file anywhere on the machine. The backend has never been run. |
-| Create and verify a backup | **Nothing to back up.** See above. The only data that needs protecting is `src/data/library.json`, the 127-component library, which is already in version control. |
-| Configure Alembic against the models | **Done** — `backend/alembic.ini`, `backend/alembic/env.py`. |
-| Generate and inspect the initial migration | **Written, not generated.** `pip install alembic` fails: PyPI does not resolve from this container, the same DNS restriction that blocks npm. `alembic revision --autogenerate` could not be run. `0001_baseline.py` was instead derived *mechanically* by parsing `models.py`, not transcribed by eye, and every file compiles under `py_compile` — but compiling is not running. |
-| Test upgrades and downgrades | **Not done.** No Alembic, no database. |
-| Document rollback | **Done** — §4 below. |
-| Run against production | **Not done, and not possible.** No production database exists. |
+| Alembic availability | Installed in the project environment and declared in `backend/requirements.txt`. |
+| Baseline comparison | `0001_baseline` was applied to scratch SQLite and compared to the original checked-in ORM models; zero drift operations. |
+| Full migration cycle | `upgrade head`, `alembic check`, `downgrade base`, and a second `upgrade head` all passed on scratch SQLite. |
+| Current ORM comparison | `alembic check` reported no new upgrade operations after the full cycle. |
+| Existing database inspection | **Not done.** The configured application database was not read or modified. |
+| PostgreSQL verification | **Not done.** Docker daemon access and a local PostgreSQL client/server were unavailable in this environment. |
+| Production verification | **Not done.** No production database was accessed. |
 
-**Consequence:** treat `0001_baseline.py` as a careful draft that must be
-verified by §3 before it is run anywhere, including a laptop.
+SQLite verifies migration mechanics, not PostgreSQL-specific behavior. Run the
+PostgreSQL check in §3 before applying these revisions to a PostgreSQL
+environment.
 
 ---
 
-## 2. The two revisions
+## 2. The revisions
 
 ```
-0001_baseline                        the schema create_all() has been producing
-   └── 0002_provenance_and_approval_state    the three architecture decisions
+0001_baseline                        the original backend ORM schema
+   └── 0002_provenance_approval
+       └── 0003_assignments_blockers
 ```
 
-**`0001_baseline`** creates the 13 MVP tables exactly as they stand. It exists
-so that a development database already created by `create_all()` can be adopted
-with `alembic stamp 0001_baseline` instead of being dropped.
+**`0001_baseline`** creates the original backend ORM schema. It can be adopted
+by an existing database only after confirming that database has exactly this
+schema; see §3. The app no longer calls `create_all()` at startup.
 
-**`0002_provenance_and_approval_state`** applies the decisions:
+**`0002_provenance_approval`** applies the decisions:
 
 - `components.approval_state` added beside `status`. Approval and development
   are separate questions and now separate columns.
-- `components.code` becomes `NOT NULL` — it is the canonical identity.
+- `components.code` remains the canonical identity from the baseline.
 - `component_provenance` created, keyed by `code`, holding the library record:
   wave, SP mappings, source, mapping, overlap, folder, `diagrams[]` and the
   rest of `LibInfo`.
+
+**`0003_assignments_blockers`** adds nullable reviewer and QA
+contacts to components, plus structured title, category, severity, responsible
+person, next action, target date, and Slack reference fields to blockers.
+Existing blocker rows retain their descriptions; new fields are nullable so
+the migration does not invent data for existing records.
 
 ### What the backfill does and does not do
 
@@ -64,7 +69,7 @@ in `docs/status-vocabulary.md`.
 
 ---
 
-## 3. Verification, to run when Alembic is installable
+## 3. Reproducing verification
 
 Do this against a scratch database, never a shared one.
 
@@ -73,38 +78,43 @@ cd backend
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 
-# A throwaway database. SQLite is enough to prove the mechanics; env.py turns
-# on batch mode so ALTER COLUMN behaves as it does on Postgres.
+# Use a new throwaway database. Never point this check at an application DB.
 export DATABASE_URL="sqlite:///./verify.db"
 
-alembic upgrade head          # 1. both revisions apply cleanly
-alembic downgrade base        # 2. both reverse cleanly
-alembic upgrade head          # 3. and re-apply
+alembic upgrade head
+alembic check
+alembic downgrade base
+alembic upgrade head
+alembic check
 
-# 4. The baseline must match the models. This must print NOTHING.
-#    Anything printed is drift between 0001+0002 and models.py.
-alembic revision --autogenerate -m "drift check" --rev-id drift_check
-cat alembic/versions/drift_check_*.py   # upgrade() must be `pass`
-rm alembic/versions/drift_check_*.py
-
-# 5. Repeat 1-3 against Postgres before going near a real environment.
+# Repeat against a disposable PostgreSQL database before using PostgreSQL.
 export DATABASE_URL="postgresql+psycopg2://apex:apex@localhost:5432/apex_verify"
 alembic upgrade head && alembic downgrade base && alembic upgrade head
 ```
 
-**Step 4 is the one that matters.** It is the check that replaces the
-autogenerate I could not run. If it emits any operations, `0001_baseline.py` is
-wrong and must be corrected before use.
+`alembic check` must report no new upgrade operations. The SQLite cycle passed;
+the PostgreSQL check remains outstanding.
 
 ### Adopting a database that already exists
 
+Do not stamp an existing database based on its age or the fact that its tables
+look familiar. First take and verify a backup, inspect its complete schema, and
+compare it with the target revision. Only then stamp the matching revision:
+
 ```bash
-alembic stamp 0001_baseline   # assert it is already at the MVP schema
-alembic upgrade head          # then apply 0002 only
+alembic stamp 0001_baseline  # only if it exactly matches the original ORM schema
+# OR:
+alembic stamp head           # only if it exactly matches the current ORM schema
 ```
 
-Never run `upgrade head` on a database created by `create_all()` without
-stamping first — `0001` would try to create tables that are already there.
+If the schema does not exactly match either state, stop and prepare a reviewed
+adoption migration; do not stamp or run `upgrade head`. Startup executes
+`alembic upgrade head`, so existing unversioned databases must be safely
+adopted before starting the application.
+
+**Production is the exception.** With `APEX_ENV=production` the app does not
+migrate at startup. Run `alembic upgrade head` by hand after a verified backup,
+or set `APEX_AUTO_MIGRATE=1` for that one deploy and unset it afterwards.
 
 ---
 
@@ -121,7 +131,18 @@ pg_restore --list pre-migration-*.dump | head
 
 A dump nobody has listed is not a backup.
 
-### 4.2 Reversing 0002
+### 4.2 Reversing 0003
+
+```bash
+alembic downgrade 0002_provenance_approval
+```
+
+This drops reviewer/QA assignments and the structured blocker fields added by
+0003. Blocker descriptions, reporter, resolution state, and timestamps remain.
+Export any assignments and structured blocker details that must be retained
+before downgrading.
+
+### 4.3 Reversing 0002
 
 ```bash
 alembic downgrade 0001_baseline
@@ -135,7 +156,7 @@ again.
 `approval_state` is dropped with its data. Nothing is lost that cannot be
 re-derived, because the backfill only read `status`, which is untouched.
 
-### 4.3 Reversing 0001
+### 4.4 Reversing 0001
 
 ```bash
 alembic downgrade base
@@ -148,7 +169,7 @@ only. On anything with real data, restore the dump instead:
 pg_restore --clean --if-exists --dbname="$DATABASE_URL" pre-migration-*.dump
 ```
 
-### 4.4 If a migration fails part-way
+### 4.5 If a migration fails part-way
 
 Postgres runs DDL transactionally, so a failed `upgrade` rolls back to the
 previous revision on its own. Confirm with `alembic current`. If it reports a
@@ -162,7 +183,6 @@ half-applied schema; delete the file and start again.
 
 ## 5. Production
 
-Nothing here has run against production, because no production database
-exists. When one does, it needs explicit approval before any migration, a
-verified dump first, and §3 passing against a copy of production data rather
-than an empty schema.
+No production database was accessed. Any production migration requires
+explicit approval, a verified backup, and successful verification against a
+production-like copy before rollout.

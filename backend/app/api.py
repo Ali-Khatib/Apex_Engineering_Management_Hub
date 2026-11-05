@@ -91,23 +91,33 @@ def list_components(category: str | None = None, status: str | None = None, owne
 class CompIn(BaseModel):
     code: str; name: str; category: str; layer: str = ""; description: str = ""; spec_md: str = ""; docs_md: str = ""
     architecture_md: str = ""; acceptance_criteria: str = ""; status: str = "proposed"; priority: str = "P2"
-    due_date: date | None = None; owner_id: int | None = None; repo_id: int | None = None; milestone_id: int | None = None
+    due_date: date | None = None; owner_id: int | None = None; reviewer_id: int | None = None
+    qa_id: int | None = None; repo_id: int | None = None; milestone_id: int | None = None
     links: dict = {}
 class CompPatch(BaseModel):
     name: str | None = None; category: str | None = None; layer: str | None = None; description: str | None = None; spec_md: str | None = None
     docs_md: str | None = None; architecture_md: str | None = None; acceptance_criteria: str | None = None; status: str | None = None
-    priority: str | None = None; due_date: date | None = None; owner_id: int | None = None; repo_id: int | None = None
+    priority: str | None = None; due_date: date | None = None; owner_id: int | None = None
+    reviewer_id: int | None = None; qa_id: int | None = None; repo_id: int | None = None
     milestone_id: int | None = None; links: dict | None = None
 
 def _validate(db, d):
     if d.get("status") and d["status"] not in STATUSES: raise HTTPException(422, f"status must be one of {STATUSES}")
     if d.get("priority") and d["priority"] not in PRIORITIES: raise HTTPException(422, f"priority must be one of {PRIORITIES}")
-    if d.get("owner_id") and not db.get(m.User, d["owner_id"]): raise HTTPException(422, "owner not found")
+    for key in ("owner_id", "reviewer_id", "qa_id"):
+        if d.get(key) and not db.get(m.User, d[key]): raise HTTPException(422, f"{key.removesuffix('_id')} not found")
     if d.get("repo_id") and not db.get(m.Repository, d["repo_id"]): raise HTTPException(422, "repository not found")
+
+def _validate_assignments(owner_id, reviewer_id, qa_id):
+    if owner_id is not None and owner_id == reviewer_id:
+        raise HTTPException(422, "Reviewer must be different from the component owner")
+    if owner_id is not None and owner_id == qa_id:
+        raise HTTPException(422, "QA contact must be different from the component owner")
 
 @router.post("/components", status_code=201)
 def create_component(b: CompIn, db: Session = Depends(get_db), admin=Depends(require_admin)):
     d = b.model_dump(); _validate(db, d)
+    _validate_assignments(d.get("owner_id"), d.get("reviewer_id"), d.get("qa_id"))
     if db.scalar(select(m.Component).where(m.Component.code == b.code)): raise HTTPException(409, "Component code already exists")
     c = m.Component(**d); db.add(c); db.flush()
     audit(db, admin, "component.create", f"{c.code} {c.name}", c.id)
@@ -128,7 +138,7 @@ def get_component(cid: int, db: Session = Depends(get_db), _=Depends(current_use
     d.update({
         "dependencies": [{"id": x.id, "code": x.code, "name": x.name, "status": x.status} for x in deps],
         "dependents": [{"id": x.id, "code": x.code, "name": x.name, "status": x.status} for x in dependents],
-        "blockers": [{"id": b.id, "description": b.description, "resolved": b.resolved, "created_at": b.created_at} for b in bl],
+        "blockers": [s.blocker_out(b) for b in bl],
         "checklist": [{"id": i.id, "text": i.text, "done": i.done} for i in db.scalars(select(m.ChecklistItem).where(m.ChecklistItem.component_id == cid).order_by(m.ChecklistItem.id))],
         "comments": [s.comment_out(x) for x in db.scalars(select(m.Comment).where(m.Comment.component_id == cid).order_by(m.Comment.created_at))],
         "acceptances": [s.acceptance_out(x) for x in db.scalars(select(m.Acceptance).where(m.Acceptance.component_id == cid).order_by(m.Acceptance.created_at.desc()))],
@@ -141,6 +151,12 @@ def get_component(cid: int, db: Session = Depends(get_db), _=Depends(current_use
 @router.patch("/components/{cid}")
 def patch_component(cid: int, b: CompPatch, db: Session = Depends(get_db), user=Depends(current_user)):
     c = _comp(db, cid); data = b.model_dump(exclude_unset=True); _validate(db, data)
+    if "owner_id" in data or "reviewer_id" in data or "qa_id" in data:
+        _validate_assignments(
+            data.get("owner_id", c.owner_id),
+            data.get("reviewer_id", c.reviewer_id),
+            data.get("qa_id", c.qa_id),
+        )
     if user.role != "admin":
         # members: owner may only move status (never to deployed) and update docs/spec text
         allowed = {"status", "docs_md", "spec_md", "architecture_md"}
@@ -151,6 +167,10 @@ def patch_component(cid: int, b: CompPatch, db: Session = Depends(get_db), user=
     for k, v in data.items():
         if getattr(c, k) != v: changes.append(f"{k}: {getattr(c, k)!r:.40} → {v!r:.40}" if k not in ("docs_md", "spec_md", "architecture_md") else f"{k} edited"); setattr(c, k, v)
     if "owner_id" in data and data["owner_id"]: notify(db, [data["owner_id"]], f"You were assigned {c.code} · {c.name}", c.id, exclude=user.id)
+    if data.get("reviewer_id") and data["reviewer_id"] != c.reviewer_id:
+        notify(db, [data["reviewer_id"]], f"You are reviewer for {c.code}", c.id, exclude=user.id)
+    if data.get("qa_id") and data["qa_id"] != c.qa_id:
+        notify(db, [data["qa_id"]], f"You are QA contact for {c.code}", c.id, exclude=user.id)
     if changes: audit(db, user, "component.update", "; ".join(changes), c.id)
     db.commit(); publish("component", {"id": c.id}); return s.component_out(c, len(open_blockers(db, c.id)), True)
 
@@ -177,6 +197,7 @@ def accept(cid: int, b: AcceptIn, db: Session = Depends(get_db), user=Depends(cu
     c = _comp(db, cid)
     if b.decision not in ("accepted", "rejected", "changes_requested"): raise HTTPException(422, "invalid decision")
     if c.owner_id == user.id and user.role != "admin": raise HTTPException(403, "Owners cannot accept their own component")
+    if c.qa_id and user.id != c.qa_id and user.role != "admin": raise HTTPException(403, "Assigned QA or admin only")
     if b.decision == "accepted" and not (b.evidence.strip() or b.evidence_url.strip()): raise HTTPException(422, "Acceptance requires evidence (text or link)")
     a = m.Acceptance(component_id=cid, reviewer_id=user.id, **b.model_dump()); db.add(a)
     c.gate_qa_accepted = b.decision == "accepted"
@@ -213,15 +234,46 @@ def request_review(cid: int, db: Session = Depends(get_db), user=Depends(current
     if not _can_edit(user, c): raise HTTPException(403, "Owner or admin only")
     if open_blockers(db, cid): raise HTTPException(409, "Resolve open blockers before requesting review")
     c.review_requested = True; c.status = "in_review"
-    audit(db, user, "review.requested", "", cid); notify(db, admin_ids(db), f"{c.code} ready for review", cid, exclude=user.id)
+    audit(db, user, "review.requested", "", cid)
+    notify(db, admin_ids(db) + [c.reviewer_id], f"{c.code} ready for review", cid, exclude=user.id)
     db.commit(); publish("component", {"id": cid}); return {"ok": True}
 
-class BlockerIn(BaseModel): description: str
+class BlockerIn(BaseModel):
+    description: str = ""
+    title: str | None = None
+    category: str | None = None
+    severity: str | None = None
+    responsible_id: int | None = None
+    next_action: str | None = None
+    target_date: date | None = None
+    slack: str | None = None
+
+@router.get("/blockers")
+def list_blockers(db: Session = Depends(get_db), _=Depends(current_user)):
+    blockers = db.scalars(select(m.Blocker).order_by(m.Blocker.created_at.desc())).unique().all()
+    return [s.blocker_out(blocker) for blocker in blockers]
+
 @router.post("/components/{cid}/blockers", status_code=201)
 def add_blocker(cid: int, b: BlockerIn, db: Session = Depends(get_db), user=Depends(current_user)):
-    c = _comp(db, cid); bl = m.Blocker(component_id=cid, description=b.description, raised_by_id=user.id); db.add(bl)
-    audit(db, user, "blocker.raised", b.description[:120], cid); notify(db, admin_ids(db) + [c.owner_id], f"Blocker on {c.code}: {b.description[:80]}", cid, exclude=user.id)
-    db.commit(); publish("component", {"id": cid}); return {"id": bl.id}
+    c = _comp(db, cid)
+    data = b.model_dump()
+    if not (data["title"] or "").strip() and not data["description"].strip():
+        raise HTTPException(422, "A blocker title or description is required")
+    if data["severity"] and data["severity"] not in ("critical", "high", "medium", "low"):
+        raise HTTPException(422, "severity must be critical|high|medium|low")
+    if data["responsible_id"] and not db.get(m.User, data["responsible_id"]):
+        raise HTTPException(422, "responsible user not found")
+    description = data["description"].strip()
+    bl = m.Blocker(
+        component_id=cid, raised_by_id=user.id, title=(data["title"] or description[:300]).strip(),
+        description=description, category=data["category"], severity=data["severity"],
+        responsible_id=data["responsible_id"], next_action=data["next_action"],
+        target_date=data["target_date"], slack=data["slack"],
+    )
+    db.add(bl)
+    audit(db, user, "blocker.raised", (bl.title or description)[:120], cid)
+    notify(db, admin_ids(db) + [c.owner_id, bl.responsible_id], f"Blocker on {c.code}: {(bl.title or description)[:80]}", cid, exclude=user.id)
+    db.commit(); publish("component", {"id": cid}); return s.blocker_out(bl)
 
 @router.post("/blockers/{bid}/resolve")
 def resolve_blocker(bid: int, db: Session = Depends(get_db), user=Depends(current_user)):

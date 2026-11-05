@@ -1,5 +1,6 @@
 import json, os, tempfile
 os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/t.db"
+os.environ["ALLOW_SIMULATED_GITHUB"] = "1"
 from fastapi.testclient import TestClient
 from app.main import app
 from app import github as gh
@@ -21,10 +22,15 @@ def test_end_to_end():
         # 1-2 admin creates, assigns owner, priority
         comp = c.post("/api/components", json={**body, "owner_id": users["amna@apexai.demo"]["id"], "priority": "P0", "repo_id": repo["id"], "acceptance_criteria": "works"}, headers=A)
         assert comp.status_code == 201; cid = comp.json()["id"]
+        assigned = c.patch(f"/api/components/{cid}", json={"reviewer_id": users["reviewer@apexai.demo"]["id"], "qa_id": users["reviewer@apexai.demo"]["id"]}, headers=A)
+        assert assigned.status_code == 200
+        assert c.patch(f"/api/components/{cid}", json={"reviewer_id": users["amna@apexai.demo"]["id"]}, headers=A).status_code == 422
         assert c.post("/api/components", json=body, headers=A).status_code == 409
         assert any("assigned" in n["message"] for n in c.get("/api/notifications", headers=M).json())
         # 3 engineer views details
-        d = c.get(f"/api/components/{cid}", headers=M).json(); assert d["owner"]["first_name"] == "Amna" and d["acceptance_criteria"] == "works"
+        d = c.get(f"/api/components/{cid}", headers=M).json()
+        assert d["owner"]["first_name"] == "Amna" and d["acceptance_criteria"] == "works"
+        assert d["reviewer"]["email"] == "reviewer@apexai.demo" and d["qa"]["email"] == "reviewer@apexai.demo"
         # 4 GitHub activity arrives via SIGNED webhook
         payload = json.dumps({"repository": {"full_name": repo["full_name"]}, "commits": [{"id": "abcdef1234", "message": "feat: x\n\nbody", "author": {"name": "amna-k"}, "url": "u"}]}).encode()
         h = {"X-GitHub-Event": "push", "X-GitHub-Delivery": "d-1", "X-Hub-Signature-256": gh.sign(payload), "Content-Type": "application/json"}
@@ -35,16 +41,30 @@ def test_end_to_end():
         # 5 comments (any user)
         assert c.post(f"/api/components/{cid}/comments", json={"body": "hello"}, headers=M).status_code == 201
         # 7 gates independent of CI: CI success does not set any gate
-        gh.simulate.__wrapped__ if hasattr(gh.simulate, "__wrapped__") else None
-        c.post(f"/api/repos/{repo['id']}/simulate?scenario=ci_success", headers=A)
+        simulated = c.post(f"/api/repos/{repo['id']}/simulate?scenario=ci_success", headers=A)
+        assert simulated.status_code == 200 and simulated.json()["simulated"] is True
         g = c.get(f"/api/components/{cid}", headers=M).json(); assert g["ci"] == "success" and not any(g["gates"].values())
         # blockers gate review
-        b = c.post(f"/api/components/{cid}/blockers", json={"description": "dep"}, headers=M).json()["id"]
+        blocker = c.post(f"/api/components/{cid}/blockers", json={
+            "title": "External dependency", "description": "dep",
+            "category": "Technical dependency", "severity": "high",
+            "responsible_id": users["amna@apexai.demo"]["id"],
+            "next_action": "Request access", "target_date": "2026-11-10",
+        }, headers=M)
+        assert blocker.status_code == 201
+        blocker_id = blocker.json()["id"]
+        listed = c.get("/api/blockers", headers=M).json()
+        saved_blocker = next(x for x in listed if x["id"] == blocker_id)
+        assert saved_blocker["title"] == "External dependency" and saved_blocker["next_action"] == "Request access"
+        b = blocker_id
         assert c.post(f"/api/components/{cid}/request-review", headers=M).status_code == 409
         assert c.post(f"/api/blockers/{b}/resolve", headers=M).status_code == 200
+        assert next(x for x in c.get("/api/blockers", headers=M).json() if x["id"] == b)["resolved"] is True
         assert c.post(f"/api/components/{cid}/request-review", headers=M).status_code == 200
         # 6 reviewer records decision; owner cannot self-accept; evidence required
         assert c.post(f"/api/components/{cid}/acceptances", json={"decision": "accepted", "evidence": "x"}, headers=M).status_code == 403
+        other = login(c, "bilal@apexai.demo", "Member123!")
+        assert c.post(f"/api/components/{cid}/acceptances", json={"decision": "accepted", "evidence": "x"}, headers=other).status_code == 403
         assert c.post(f"/api/components/{cid}/acceptances", json={"decision": "accepted"}, headers=R).status_code == 422
         assert c.post(f"/api/components/{cid}/gates", json={"gate": "ready_for_deploy", "value": True}, headers=A).status_code == 409
         assert c.post(f"/api/components/{cid}/gates", json={"gate": "checks_passed", "value": True}, headers=M).status_code == 200

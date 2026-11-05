@@ -11,7 +11,7 @@ const toT = (s: string) => new Date(s + "T00:00:00").getTime();
 
 export function Plan({ initialTab = "timeline" }: { initialTab?: "timeline" | "deps" }) {
   const [view, setView] = useState<"timeline" | "deps">(initialTab);
-  const { state, isAdmin, person, updateComponent, savePlanNotes, deleteMilestone } = useStore();
+  const { state, isAdmin, apiMode, person, updateComponent, savePlanNotes, deleteMilestone } = useStore();
   const { toast } = useToast();
   const [groupBy, setGroupBy] = useState<"project" | "category">("project");
   const [scale, setScale] = useState<"week" | "month">("week");
@@ -68,7 +68,13 @@ export function Plan({ initialTab = "timeline" }: { initialTab?: "timeline" | "d
       <header className="hero-head"><div><h1>Plan</h1><p className="lede">Milestones, the schedule, and what depends on what.</p></div>
         <Segmented options={[{ id: "timeline", label: "Timeline" }, { id: "deps", label: "Dependencies" }]} value={view} onChange={setView} />
       </header>
-      {view === "deps" ? <Graph embedded /> : <>
+      {view === "deps" ? <Graph embedded /> : apiMode ? (
+        <Section title="Timeline unavailable in connected mode">
+          <Empty icon="calendar" title="The backend does not store timeline inputs yet">
+            Component start dates, ETAs, plan notes, and milestones are not persisted. Use the Dependencies view for backend-backed planning.
+          </Empty>
+        </Section>
+      ) : <>
       <div className="row" style={{ justifyContent: "flex-end", marginTop: -12 }}>
         <Segmented options={[{ id: "project", label: "By project" }, { id: "category", label: "By category" }]} value={groupBy} onChange={setGroupBy} />
         <Segmented options={[{ id: "week", label: "Weeks" }, { id: "month", label: "Months" }]} value={scale} onChange={setScale} />
@@ -158,7 +164,7 @@ export function Plan({ initialTab = "timeline" }: { initialTab?: "timeline" | "d
         </Section>
       </div>
       </>}
-      {ms && <MilestoneModal m={ms === "new" ? null : ms} onClose={() => setMs(null)} onDelete={id => { deleteMilestone(id); toast("Milestone removed"); }} />}
+      {!apiMode && ms && <MilestoneModal m={ms === "new" ? null : ms} onClose={() => setMs(null)} onDelete={id => { deleteMilestone(id); toast("Milestone removed"); }} />}
     </>
   );
 }

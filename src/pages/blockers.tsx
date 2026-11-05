@@ -8,14 +8,16 @@ import type { Blocker, BlockerStatus, Handoff } from "../types";
 export const BLOCKER_CATEGORIES = ["Technical dependency", "Missing access", "Infrastructure issue", "External API issue", "Unavailable credentials or configuration", "Pending decision", "Third-party dependency", "Failed CI/CD pipeline", "QA rejection", "Missing documentation", "Resource availability", "Client-side dependency"];
 const STATUS: [BlockerStatus, string, string][] = [["open", "Open", "crit"], ["acknowledged", "Acknowledged", "warn"], ["in_progress", "In progress", "info"], ["waiting_external", "Waiting on external party", "review"], ["escalated", "Escalated", "crit-solid"], ["resolved", "Resolved", "ok"], ["closed", "Closed", "faint"]];
 export const blockerStatus = (s: BlockerStatus) => { const x = STATUS.find(z => z[0] === s)!; return <Pill tone={x[2]} dot>{x[1]}</Pill>; };
-const SEV_TONE = { critical: "crit-solid", high: "crit", medium: "warn", low: "neutral" } as const;
+const SEV_TONE = { critical: "crit-solid", high: "crit", medium: "warn", low: "neutral", unspecified: "faint" } as const;
 
 export function BlockerModal({ componentId, onClose }: { componentId?: string; onClose: () => void }) {
   const { state, addBlocker, me } = useStore();
   const { toast } = useToast();
   const [f, setF] = useState({ componentId: componentId || "", title: "", description: "", category: BLOCKER_CATEGORIES[0], severity: "high" as Blocker["severity"], responsibleId: null as string | null, nextAction: "", target: addDays(iso(today()), 3), slack: "" });
   const [err, setErr] = useState<Record<string, string>>({});
-  const save = () => {
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (saving) return;
     const e: Record<string, string> = {};
     if (!f.componentId) e.componentId = "Choose the component this blocks.";
     if (!f.title.trim()) e.title = "Summarise the blocker in a few words.";
@@ -24,11 +26,14 @@ export function BlockerModal({ componentId, onClose }: { componentId?: string; o
     if (f.target < iso(today())) e.target = "Target date can't be in the past.";
     if (/(password|secret|token|api[_ -]?key)\s*[:=]\s*\S{6,}/i.test(f.description)) e.description = "Looks like a credential. Never paste secrets here; reference the Vault path instead.";
     setErr(e); if (Object.keys(e).length) return;
-    addBlocker({ ...f, title: f.title.trim(), description: f.description.trim(), nextAction: f.nextAction.trim(), slack: f.slack.trim() || undefined } as any);
-    toast("Blocker raised. Responsible person and owner notified."); onClose();
+    setSaving(true);
+    try {
+      const saved = await addBlocker({ ...f, title: f.title.trim(), description: f.description.trim(), nextAction: f.nextAction.trim(), slack: f.slack.trim() || undefined });
+      if (saved) { toast("Blocker raised. Responsible person and owner notified."); onClose(); }
+    } finally { setSaving(false); }
   };
   return (
-    <Modal title="Raise a blocker" sub="Recorded here instead of buried in chat, with a clear owner and next step." onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={save}>Raise blocker</Button></>}>
+    <Modal title="Raise a blocker" sub="Recorded here instead of buried in chat, with a clear owner and next step." onClose={onClose} footer={<><Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? "Saving…" : "Raise blocker"}</Button></>}>
       <div className="form-grid">
         <Field label="Component" error={err.componentId} full><select value={f.componentId} onChange={e => setF({ ...f, componentId: e.target.value })} disabled={!!componentId}><option value="">Choose…</option>{state.components.map(c => <option key={c.id} value={c.id}>{c.id} · {c.name}</option>)}</select></Field>
         <Field label="What's blocked" error={err.title} full><input type="text" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="e.g. Staging database credentials not issued" /></Field>
@@ -65,7 +70,7 @@ export function BlockerRow({ b, hideComponent }: { b: Blocker; hideComponent?: b
           <span className="blki-lbl">Next</span>
           <span className="blki-act">{b.nextAction}</span>
           <PersonChip id={b.responsibleId} size={18} />
-          <span className={cx("blki-due", over && "is-over")}>{fmtDate(b.target)}{OPEN_BLOCKER(b) && <em>{relDays(b.target)}</em>}</span>
+          <span className={cx("blki-due", over && "is-over")}>{b.target ? <>{fmtDate(b.target)}{OPEN_BLOCKER(b) && <em>{relDays(b.target)}</em>}</> : "No target date"}</span>
         </div>
       </button>
       {open && <BlockerDrawer b={b} onClose={() => setOpen(false)} />}
@@ -74,18 +79,23 @@ export function BlockerRow({ b, hideComponent }: { b: Blocker; hideComponent?: b
 }
 
 function BlockerDrawer({ b, onClose }: { b: Blocker; onClose: () => void }) {
-  const { state, me, isAdmin, updateBlocker, component } = useStore();
+  const { state, me, isAdmin, apiMode, updateBlocker, component } = useStore();
   const { toast } = useToast();
-  const canEdit = isAdmin || b.responsibleId === me?.id || b.reportedBy === me?.id || component(b.componentId)?.ownerId === me?.id;
+  const canEdit = apiMode
+    ? isAdmin || component(b.componentId)?.ownerId === me?.id
+    : isAdmin || b.responsibleId === me?.id || b.reportedBy === me?.id || component(b.componentId)?.ownerId === me?.id;
   const [f, setF] = useState({ status: b.status, responsibleId: b.responsibleId, nextAction: b.nextAction, target: b.target, note: "" });
   const hist = state.history.filter(h => h.action.includes(b.id));
-  const save = () => {
-    updateBlocker(b.id, { status: f.status, responsibleId: f.responsibleId, nextAction: f.nextAction, target: f.target }, f.note.trim() || undefined);
+  const save = async () => {
+    if (!await updateBlocker(b.id, { status: f.status, responsibleId: f.responsibleId, nextAction: f.nextAction, target: f.target }, f.note.trim() || undefined)) return;
     toast(f.status !== b.status ? `Blocker ${f.status.replace(/_/g, " ")}` : "Blocker updated"); onClose();
+  };
+  const resolve = async () => {
+    if (await updateBlocker(b.id, { status: "resolved" })) { toast("Blocker resolved"); onClose(); }
   };
   return (
     <Drawer title={b.title} sub={<>{b.id} · <a href={"#c-" + b.componentId}>{component(b.componentId)?.name}</a></>} onClose={onClose}
-      footer={canEdit ? <><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={save}>Save update</Button></> : undefined}>
+      footer={apiMode ? (canEdit && OPEN_BLOCKER(b) ? <Button variant="primary" onClick={() => void resolve()}>Resolve blocker</Button> : undefined) : canEdit ? <><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={() => void save()}>Save update</Button></> : undefined}>
       <div className="row">{blockerStatus(b.status)}<Pill tone={SEV_TONE[b.severity]}>{b.severity}</Pill><Pill tone="faint">{b.category}</Pill></div>
       {b.description && <p style={{ color: "var(--fg-2)" }}>{b.description}</p>}
       <dl>
@@ -94,7 +104,9 @@ function BlockerDrawer({ b, onClose }: { b: Blocker; onClose: () => void }) {
         {b.slack && <KV k="Discussion"><span className="row" style={{ gap: 6 }}><Icon name="slack" size={14} />{b.slack}</span></KV>}
         <KV k="Last updated">{ago(b.updatedAt)}</KV>
       </dl>
-      {canEdit ? (
+      {apiMode ? (
+        <p className="muted" style={{ fontSize: 13 }}>{OPEN_BLOCKER(b) ? "Resolve this blocker once the underlying issue is cleared. Editing status details is not supported by the backend yet." : "This blocker has been resolved."}</p>
+      ) : canEdit ? (
         <div style={{ display: "grid", gap: 14 }}>
           <Field label="Status"><select value={f.status} onChange={e => setF({ ...f, status: e.target.value as BlockerStatus })}>{STATUS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
           <Field label="Responsible"><PersonSelect value={f.responsibleId} onChange={v => setF({ ...f, responsibleId: v })} /></Field>
@@ -159,7 +171,7 @@ export function Blockers() {
     const m = new Map<string, number>(); active.forEach(b => b.responsibleId && m.set(b.responsibleId, (m.get(b.responsibleId) || 0) + 1));
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [state.blockers]);
-  const list = (tab === "active" ? active : resolved).filter(b => !who || b.responsibleId === who).sort((a, b) => ({ critical: 0, high: 1, medium: 2, low: 3 }[a.severity] - { critical: 0, high: 1, medium: 2, low: 3 }[b.severity]) || a.target.localeCompare(b.target));
+  const list = (tab === "active" ? active : resolved).filter(b => !who || b.responsibleId === who).sort((a, b) => ({ critical: 0, high: 1, medium: 2, low: 3, unspecified: 4 }[a.severity] - { critical: 0, high: 1, medium: 2, low: 3, unspecified: 4 }[b.severity]) || a.target.localeCompare(b.target));
   const pending = state.handoffs.filter(h => h.status === "awaiting_ack");
   return (
     <>

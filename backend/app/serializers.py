@@ -15,7 +15,8 @@ def component_out(c, blockers=0, detail=False):
     today = date.today()
     at_risk = bool(blockers) or (c.due_date is not None and c.due_date < today and c.status not in ("done", "deployed")) or c.status == "blocked"
     d = {"id": c.id, "code": c.code, "name": c.name, "category": c.category, "layer": c.layer, "status": c.status,
-         "priority": c.priority, "due_date": c.due_date, "owner": user_out(c.owner), "repo": repo_out(c.repo),
+         "priority": c.priority, "due_date": c.due_date, "owner": user_out(c.owner),
+         "reviewer": user_out(c.reviewer), "qa": user_out(c.qa), "repo": repo_out(c.repo),
          "milestone_id": c.milestone_id, "open_blockers": blockers, "at_risk": at_risk,
          "unassigned": c.owner_id is None, "review_requested": c.review_requested,
          "gates": {"checks_passed": c.gate_checks_passed, "qa_accepted": c.gate_qa_accepted, "ready_for_deploy": c.gate_ready_for_deploy},
@@ -35,6 +36,16 @@ def comment_out(c):
 def acceptance_out(a):
     return {"id": a.id, "decision": a.decision, "evidence": a.evidence, "evidence_url": a.evidence_url,
             "created_at": a.created_at, "reviewer": user_out(a.reviewer)}
+
+def blocker_out(b):
+    return {
+        "id": b.id, "component_id": b.component_id, "component_code": b.component.code,
+        "title": b.title, "description": b.description, "category": b.category,
+        "severity": b.severity, "responsible_id": b.responsible_id,
+        "raised_by": user_out(b.raised_by), "next_action": b.next_action,
+        "target_date": b.target_date, "slack": b.slack, "resolved": b.resolved,
+        "created_at": b.created_at, "resolved_at": b.resolved_at,
+    }
 
 def audit_out(a):
     return {"id": a.id, "action": a.action, "detail": a.detail, "created_at": a.created_at,

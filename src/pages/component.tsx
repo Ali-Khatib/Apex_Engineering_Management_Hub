@@ -24,11 +24,14 @@ const LINK_META: Record<LinkKind, { icon: string; label: string; role: string }>
 };
 
 export function ComponentPage({ id }: { id: string }) {
-  const { state, component, person, me, isAdmin, deleteComponent, updateComponent, submitForReview } = useStore();
+  const { state, component, person, me, isAdmin, apiMode, loadComponentDetail, deleteComponent, updateComponent, submitForReview } = useStore();
   const { go } = useNav();
   const { toast } = useToast();
   const can = useCan();
   const c = component(id);
+  useEffect(() => {
+    if (c) void loadComponentDetail(id);
+  }, [id, c?.id, loadComponentDetail]);
   const [tab, setTab] = useState(() => { try { return sessionStorage.getItem("apex-tab-" + id) || "overview"; } catch { return "overview"; } });
   useEffect(() => { try { sessionStorage.setItem("apex-tab-" + id, tab); } catch { } }, [tab, id]);
   const [modal, setModal] = useState<"" | "edit" | "assign" | "blocker">("");
@@ -65,7 +68,15 @@ export function ComponentPage({ id }: { id: string }) {
           <div className="page-actions">
             {canStatus && (
               <Menu trigger={(o, t) => <Button icon="flag" iconRight="chevronDown" onClick={t} aria-expanded={o}>Status</Button>}>
-                {close => <>{transitions.map(([s, l]) => <MenuItem key={s} onClick={() => { close(); if (s === "under_review") submitForReview(c.id); else updateComponent(c.id, { status: s }); toast(s === "under_review" ? "Submitted for review" : `Status: ${STATUS_LABEL[s]}`); }}>{l}</MenuItem>)}</>}
+                {close => <>{transitions.map(([s, l]) => <MenuItem key={s} onClick={() => {
+                  close();
+                  void (async () => {
+                    const saved = s === "under_review"
+                      ? await submitForReview(c.id)
+                      : await updateComponent(c.id, { status: s });
+                    if (saved) toast(s === "under_review" ? "Submitted for review" : `Status: ${STATUS_LABEL[s]}`);
+                  })();
+                }}>{l}</MenuItem>)}</>}
               </Menu>
             )}
             {isAdmin && <Button variant="primary" icon="edit" onClick={() => setModal("edit")}>Edit</Button>}
@@ -73,7 +84,12 @@ export function ComponentPage({ id }: { id: string }) {
               {close => <>
                 <MenuItem icon="blockers" onClick={() => { close(); setModal("blocker"); }}>Add blocker</MenuItem>
                 {isAdmin && <MenuItem icon="team" onClick={() => { close(); setModal("assign"); }}>Assign people</MenuItem>}
-                {isAdmin && <><div className="menu-sep" /><div style={{ padding: 4 }}><ConfirmButton label="Delete component" confirmText="Delete" onConfirm={() => { close(); deleteComponent(c.id); toast(`${c.id} deleted`); go("components"); }} /></div></>}
+                {isAdmin && <><div className="menu-sep" /><div style={{ padding: 4 }}><ConfirmButton label="Delete component" confirmText="Delete" onConfirm={() => {
+                  close();
+                  void (async () => {
+                    if (await deleteComponent(c.id)) { toast(`${c.id} deleted`); go("components"); }
+                  })();
+                }} /></div></>}
               </>}
             </Menu>
           </div>
@@ -110,10 +126,11 @@ export function ComponentPage({ id }: { id: string }) {
 
 // ───────────── Overview ─────────────
 function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string) => void; onBlocker: () => void }) {
-  const { state, isAdmin, person, updateComponent, removeLink } = useStore();
+  const { state, isAdmin, apiMode, person, updateComponent, removeLink } = useStore();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(c.details);
+  const [savingDetails, setSavingDetails] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const can = useCan();
   const repo = state.repos.find(r => r.id === c.repoId);
@@ -131,7 +148,9 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
     <div className="split">
       <div className="stack-v">
         <NextActionBar c={c} />
-        <BlockerAlarm c={c} onAdd={onBlocker} />
+        {apiMode
+          ? <p className="muted" style={{ fontSize: 13 }}>Open blockers for this component are listed on the Blockers page.</p>
+          : <BlockerAlarm c={c} onAdd={onBlocker} />}
 
         {/* Purpose, contract and architecture describe the same component from
             three angles, so they are one surface divided by rules, not three
@@ -207,7 +226,14 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
             {editing ? (
               <div style={{ display: "grid", gap: 12 }}>
                 <MarkdownEditor value={draft} onChange={setDraft} rows={18} />
-                <div className="row" style={{ justifyContent: "flex-end" }}><Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button><Button variant="primary" icon="check" onClick={() => { updateComponent(c.id, { details: draft }); setEditing(false); toast("Details saved"); }}>Save details</Button></div>
+                <div className="row" style={{ justifyContent: "flex-end" }}><Button variant="ghost" disabled={savingDetails} onClick={() => setEditing(false)}>Cancel</Button><Button variant="primary" icon="check" disabled={savingDetails} onClick={() => {
+                  void (async () => {
+                    setSavingDetails(true);
+                    try {
+                      if (await updateComponent(c.id, { details: draft })) { setEditing(false); toast("Details saved"); }
+                    } finally { setSavingDetails(false); }
+                  })();
+                }}>{savingDetails ? "Saving…" : "Save details"}</Button></div>
               </div>
             ) : (
               <>
@@ -233,7 +259,7 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
             </div>
           </Section>
         )}
-        <Section title="Linked systems" sub="Each system keeps its own records" actions={can.ownerOrAdmin(c) && <Button size="sm" icon="plus" variant="ghost" onClick={() => setLinkOpen(true)}>Link</Button>}>
+        <Section title="Linked systems" sub="Each system keeps its own records" actions={(apiMode ? isAdmin : can.ownerOrAdmin(c)) && <Button size="sm" icon="plus" variant="ghost" onClick={() => setLinkOpen(true)}>Link</Button>}>
           <div className="panel-body"><div className="links">
             {c.links.length === 0 && <span className="muted" style={{ fontSize: 13 }}>No linked records.</span>}
             {c.links.map(l => (
@@ -243,7 +269,9 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
                   <span style={{ minWidth: 0 }}><b>{l.label}</b><small>{LINK_META[l.kind].label} · {LINK_META[l.kind].role}</small></span>
                   <Icon name="external" size={13} className="muted" />
                 </a>
-                {can.ownerOrAdmin(c) && <Button size="sm" variant="ghost" icon="x" aria-label={`Remove ${l.label}`} onClick={() => { removeLink(c.id, l.id); toast("Link removed"); }} />}
+                {(apiMode ? isAdmin : can.ownerOrAdmin(c)) && <Button size="sm" variant="ghost" icon="x" aria-label={`Remove ${l.label}`} onClick={() => {
+                  void (async () => { if (await removeLink(c.id, l.id)) toast("Link removed"); })();
+                }} />}
               </div>
             ))}
           </div></div>
@@ -255,23 +283,31 @@ function OverviewTab({ c, onTab, onBlocker }: { c: Component; onTab: (t: string)
 }
 
 function LinkModal({ c, onClose, kind = "erpnext" }: { c: Component; onClose: () => void; kind?: LinkKind }) {
-  const { addLink } = useStore();
+  const { addLink, apiMode } = useStore();
   const { toast } = useToast();
   const [f, setF] = useState({ kind, label: "", url: "", ref: "" });
   const [err, setErr] = useState<Record<string, string>>({});
-  const save = () => {
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (saving) return;
     const e: Record<string, string> = {};
-    if (!f.label.trim()) e.label = "Give the link a label people will recognise.";
+    if (!apiMode && !f.label.trim()) e.label = "Give the link a label people will recognise.";
     if (!/^https:\/\/\S+$/.test(f.url.trim())) e.url = "Use a full https:// link.";
     setErr(e); if (Object.keys(e).length) return;
-    addLink(c.id, { ...f, label: f.label.trim(), url: f.url.trim(), ref: f.ref.trim() || f.label.trim() }); toast("Linked"); onClose();
+    setSaving(true);
+    try {
+      if (await addLink(c.id, { ...f, label: f.label.trim() || LINK_META[f.kind].label, url: f.url.trim(), ref: f.ref.trim() || f.label.trim() })) {
+        toast("Linked"); onClose();
+      }
+    } finally { setSaving(false); }
   };
   return (
-    <Modal title="Link an external record" sub="The record stays in its own system; this adds a reference." onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={save}>Add link</Button></>}>
+    <Modal title="Link an external record" sub="The record stays in its own system; this adds a reference." onClose={onClose} footer={<><Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Add link"}</Button></>}>
       <Field label="System"><select value={f.kind} onChange={e => setF({ ...f, kind: e.target.value as LinkKind })}>{(Object.keys(LINK_META) as LinkKind[]).map(k => <option key={k} value={k}>{LINK_META[k].label} — {LINK_META[k].role}</option>)}</select></Field>
-      <Field label="Label" error={err.label}><input type="text" value={f.label} onChange={e => setF({ ...f, label: e.target.value })} placeholder="e.g. Task PROJ-0042-T-140" /></Field>
+      {!apiMode && <Field label="Label" error={err.label}><input type="text" value={f.label} onChange={e => setF({ ...f, label: e.target.value })} placeholder="e.g. Task PROJ-0042-T-140" /></Field>}
       <Field label="URL" error={err.url}><input type="url" value={f.url} onChange={e => setF({ ...f, url: e.target.value })} placeholder="https://" /></Field>
-      <Field label="External record ID" hint="Optional"><input type="text" value={f.ref} onChange={e => setF({ ...f, ref: e.target.value })} /></Field>
+      {!apiMode && <Field label="External record ID" hint="Optional"><input type="text" value={f.ref} onChange={e => setF({ ...f, ref: e.target.value })} /></Field>}
+      {apiMode && <p className="muted" style={{ fontSize: 13 }}>The backend stores one URL per system; labels and external record IDs are not stored.</p>}
     </Modal>
   );
 }
@@ -357,27 +393,38 @@ function CritStatusPill({ k }: { k: Criterion }) {
   return <Pill tone={tone}>{l}</Pill>;
 }
 
-function NoteModal({ title, sub, cta, tone = "primary", required, onSave, onClose }: { title: string; sub?: string; cta: string; tone?: "primary" | "danger"; required?: boolean; onSave: (n: string) => void; onClose: () => void }) {
+function NoteModal({ title, sub, cta, tone = "primary", required, onSave, onClose }: { title: string; sub?: string; cta: string; tone?: "primary" | "danger"; required?: boolean; onSave: (n: string) => void | boolean | Promise<void | boolean>; onClose: () => void }) {
   const [n, setN] = useState(""); const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (saving) return;
+    if (required && !n.trim()) { setErr("Add a note so the owner knows what to do next."); return; }
+    setSaving(true);
+    try {
+      if (await onSave(n.trim()) !== false) onClose();
+    } finally { setSaving(false); }
+  };
   return (
-    <Modal title={title} sub={sub} onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant={tone} onClick={() => { if (required && !n.trim()) { setErr("Add a note so the owner knows what to do next."); return; } onSave(n.trim()); onClose(); }}>{cta}</Button></>}>
+    <Modal title={title} sub={sub} onClose={onClose} footer={<><Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button><Button variant={tone} onClick={save} disabled={saving}>{saving ? "Saving…" : cta}</Button></>}>
       <Field label={required ? "Note" : "Note (optional)"} error={err}><textarea rows={4} value={n} onChange={e => setN(e.target.value)} /></Field>
     </Modal>
   );
 }
 
 function AcceptanceTab({ c }: { c: Component }) {
-  const { state, me, isAdmin, person, setQA, setDeploy, setReview, submitForReview, addCriterion, removeCriterion } = useStore();
+  const { state, me, isAdmin, apiMode, person, setQA, setDeploy, setReview, submitForReview, addCriterion, removeCriterion } = useStore();
   const { toast } = useToast();
   const can = useCan();
   const [open, setOpen] = useState<string | null>(c.criteria.find(k => k.status !== "accepted")?.id || null);
-  const [note, setNote] = useState<null | { title: string; sub?: string; cta: string; tone?: "primary" | "danger"; required?: boolean; run: (n: string) => void }>(null);
+  const [note, setNote] = useState<null | { title: string; sub?: string; cta: string; tone?: "primary" | "danger"; required?: boolean; run: (n: string) => void | boolean | Promise<void | boolean> }>(null);
   const [evFor, setEvFor] = useState<Criterion | null>(null);
   const [critOpen, setCritOpen] = useState(false);
   const repo = state.repos.find(r => r.id === c.repoId);
   const unmet = deployBlockers(state, c);
   const g = c.gates;
-  const isQA = can.qaDecide(c);
+  const isQA = apiMode
+    ? (isAdmin || (c.qaId ? c.qaId === me?.id : c.ownerId !== me?.id))
+    : can.qaDecide(c);
   const canDeploy = can.deployApprove();
   const isReviewer = isAdmin || c.reviewerId === me?.id;
   const acc = c.criteria.filter(k => k.status === "accepted").length;
@@ -388,23 +435,23 @@ function AcceptanceTab({ c }: { c: Component }) {
         <div className={cx("gate-card", g.checks.state === "passed" && "on", g.checks.state === "failed" && "bad")}>
           <h4><span className="gate-num">1</span>Checks passed<Pill tone={CHECK_TONE[g.checks.state]} className="" >{label(g.checks.state)}</Pill></h4>
           <span className="meta">From GitHub Actions{g.checks.commit ? <> on <code className="sha">{g.checks.commit.slice(0, 7)}</code></> : ""}{g.checks.at ? ` · ${ago(g.checks.at)}` : ""}</span>
-          {repo?.github.runs.length ? <div style={{ display: "grid", gap: 4 }}>{repo.github.runs.map(run => <div key={run.name} className="row-between" style={{ fontSize: 12 }}><span className="row" style={{ gap: 6 }}><i className="pill-dot" style={{ color: `var(--${CHECK_TONE[run.state] === "ok" ? "ok" : CHECK_TONE[run.state] === "crit" ? "crit" : "fg-4"})` }} />{run.name}{run.required && <span className="muted">required</span>}</span><span className="muted">{label(run.state)}</span></div>)}</div> : <span className="meta">{repo ? "No runs yet." : "Link a repository to track checks."}</span>}
+          {repo?.github.runs.length ? <div style={{ display: "grid", gap: 4 }}>{repo.github.runs.map(run => <div key={run.name} className="row-between" style={{ fontSize: 12 }}><span className="row" style={{ gap: 6 }}><i className="pill-dot" style={{ color: `var(--${CHECK_TONE[run.state] === "ok" ? "ok" : CHECK_TONE[run.state] === "crit" ? "crit" : "fg-4"})` }} />{run.name}{run.required && <span className="muted">required</span>}</span><span className="muted">{label(run.state)}</span></div>)}</div> : <span className="meta">{!repo ? "Link a repository to track checks." : repo.githubActivityLoaded === false ? "GitHub runs have not been loaded from the API." : "No runs recorded."}</span>}
           <span className="meta" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}><Icon name="lock" size={12} /> Read-only. Never changes QA status.</span>
         </div>
         <div className={cx("gate-card", g.qa.state === "accepted" && "on", ["rejected", "changes_requested"].includes(g.qa.state) && "bad")}>
           <h4><span className="gate-num">2</span>QA accepted<Pill tone={QA_TONE[g.qa.state]}>{label(g.qa.state)}</Pill></h4>
           <span className="meta">{g.qa.by ? <>{personName(person(g.qa.by))} · {fmtDateTime(g.qa.at)}</> : `QA contact: ${personName(person(c.qaId))}`}</span>
           {g.qa.note && <p className="ev-note">{g.qa.note}</p>}
-          <span className="meta">{acc} of {c.criteria.length} criteria accepted</span>
+          <span className="meta">{apiMode ? "QA is recorded as one component-level decision." : `${acc} of ${c.criteria.length} criteria accepted`}</span>
           {isQA ? <div className="row" style={{ gap: 6 }}>
-            {(g.qa.state === "awaiting" || g.qa.state === "not_submitted" || g.qa.state === "changes_requested") && <Button size="sm" onClick={() => { setQA(c.id, "in_progress"); toast("QA started"); }} disabled={g.qa.state === "not_submitted" && c.status !== "under_review"} title={g.qa.state === "not_submitted" ? "Owner must submit for review first" : undefined}>Start QA</Button>}
-            {g.qa.state === "in_progress" && <>
-              <Button size="sm" variant="primary" icon="check" disabled={g.checks.state === "failed"} title={g.checks.state === "failed" ? "Required checks are failing" : undefined} onClick={() => setNote({ title: "Accept QA", sub: "Records your acceptance. Deployment still needs its own approval.", cta: "Accept", run: n => { setQA(c.id, "accepted", n || "Accepted."); toast("QA accepted"); } })}>Accept</Button>
-              <Button size="sm" onClick={() => setNote({ title: "Request changes", cta: "Request changes", required: true, run: n => { setQA(c.id, "changes_requested", n); toast("Changes requested"); } })}>Request changes</Button>
-              <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Reject", cta: "Reject", tone: "danger", required: true, run: n => { setQA(c.id, "rejected", n); toast("QA rejected", "warn"); } })}>Reject</Button>
+            {!apiMode && (g.qa.state === "awaiting" || g.qa.state === "not_submitted" || g.qa.state === "changes_requested") && <Button size="sm" onClick={() => { void setQA(c.id, "in_progress").then(saved => { if (saved) toast("QA started"); }); }} disabled={g.qa.state === "not_submitted" && c.status !== "under_review"} title={g.qa.state === "not_submitted" ? "Owner must submit for review first" : undefined}>Start QA</Button>}
+            {(g.qa.state === "in_progress" || (apiMode && g.qa.state === "awaiting")) && <>
+              <Button size="sm" variant="primary" icon="check" disabled={g.checks.state === "failed"} title={g.checks.state === "failed" ? "Required checks are failing" : undefined} onClick={() => setNote({ title: "Accept QA", sub: "Records your acceptance. Deployment still needs its own approval.", cta: "Accept", run: async n => { const saved = await setQA(c.id, "accepted", n || "Accepted."); if (saved) toast("QA accepted"); return saved; } })}>Accept</Button>
+              <Button size="sm" onClick={() => setNote({ title: "Request changes", cta: "Request changes", required: true, run: async n => { const saved = await setQA(c.id, "changes_requested", n); if (saved) toast("Changes requested"); return saved; } })}>Request changes</Button>
+              <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Reject", cta: "Reject", tone: "danger", required: true, run: async n => { const saved = await setQA(c.id, "rejected", n); if (saved) toast("QA rejected", "warn"); return saved; } })}>Reject</Button>
             </>}
-            {g.qa.state === "accepted" && isAdmin && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Reopen QA", cta: "Reopen", required: true, run: n => setQA(c.id, "in_progress", n) })}>Reopen</Button>}
-          </div> : <span className="meta"><Icon name="lock" size={12} /> Only the QA contact or an admin can record QA decisions.</span>}
+            {!apiMode && g.qa.state === "accepted" && isAdmin && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Reopen QA", cta: "Reopen", required: true, run: n => setQA(c.id, "in_progress", n) })}>Reopen</Button>}
+          </div> : <span className="meta"><Icon name="lock" size={12} /> {apiMode ? "Component owners cannot accept their own QA." : "Only the QA contact or an admin can record QA decisions."}</span>}
         </div>
         <div className={cx("gate-card", ["ready", "deployed"].includes(g.deploy.state) && "on")}>
           <h4><span className="gate-num">3</span>Ready for deployment<Pill tone={DEPLOY_TONE[g.deploy.state]}>{label(g.deploy.state)}</Pill></h4>
@@ -412,24 +459,27 @@ function AcceptanceTab({ c }: { c: Component }) {
           {g.deploy.note && <p className="ev-note">{g.deploy.note}</p>}
           {g.deploy.state !== "deployed" && g.deploy.state !== "ready" && (unmet.length ? <><span className="meta">Still needed:</span><ul>{unmet.map(u => <li key={u}>{u}</li>)}</ul></> : <span className="meta" style={{ color: "var(--ok)" }}>All requirements met. Ready for approval.</span>)}
           {isAdmin ? <div className="row" style={{ gap: 6 }}>
-            {!["ready", "deployed", "scheduled"].includes(g.deploy.state) && canDeploy && <Button size="sm" variant="primary" icon="rocket" disabled={unmet.length > 0} onClick={() => setNote({ title: "Approve for deployment", sub: "Confirms configuration and environment have been reviewed.", cta: "Approve", run: n => { setDeploy(c.id, "ready", n || "Approved."); toast("Approved for deployment"); } })}>Approve</Button>}
-            {g.deploy.state === "ready" && canDeploy && <Button size="sm" variant="primary" icon="rocket" onClick={() => setNote({ title: "Record deployment", cta: "Mark deployed", run: n => { setDeploy(c.id, "deployed", n || "Deployed."); toast("Deployment recorded"); } })}>Mark deployed</Button>}
-            {g.deploy.state === "ready" && canDeploy && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Withdraw approval", cta: "Withdraw", required: true, run: n => setDeploy(c.id, "not_ready", n) })}>Withdraw</Button>}
-            {g.deploy.state === "deployed" && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Record rollback", cta: "Rolled back", tone: "danger", required: true, run: n => setDeploy(c.id, "rolled_back", n) })}>Record rollback</Button>}
+            {!["ready", "deployed", "scheduled"].includes(g.deploy.state) && canDeploy && <Button size="sm" variant="primary" icon="rocket" disabled={unmet.length > 0} onClick={() => setNote({ title: "Approve for deployment", sub: "Confirms configuration and environment have been reviewed.", cta: "Approve", run: async n => { const saved = await setDeploy(c.id, "ready", n); if (saved) toast("Approved for deployment"); return saved; } })}>Approve</Button>}
+            {g.deploy.state === "ready" && canDeploy && <Button size="sm" variant="primary" icon="rocket" onClick={() => setNote({ title: "Record deployment", cta: "Mark deployed", run: async n => { const saved = await setDeploy(c.id, "deployed", n); if (saved) toast("Deployment recorded"); return saved; } })}>Mark deployed</Button>}
+            {g.deploy.state === "ready" && canDeploy && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Withdraw approval", cta: "Withdraw", required: true, run: async n => { const saved = await setDeploy(c.id, "not_ready", n); return saved; } })}>Withdraw</Button>}
+            {!apiMode && g.deploy.state === "deployed" && <Button size="sm" variant="ghost" onClick={() => setNote({ title: "Record rollback", cta: "Rolled back", tone: "danger", required: true, run: n => setDeploy(c.id, "rolled_back", n) })}>Record rollback</Button>}
           </div> : <span className="meta"><Icon name="lock" size={12} /> Only admins approve deployments.</span>}
         </div>
       </div>
 
-      <Section title="Code review" sub={`Reviewer: ${personName(person(c.reviewerId))}`} actions={<>
+      <Section title="Code review" sub={apiMode ? "The backend records review requests and QA decisions, but not separate code-review decisions or reviewer assignments." : `Reviewer: ${personName(person(c.reviewerId))}`} actions={apiMode
+        ? (c.ownerId === me?.id || isAdmin) && ["in_progress", "blocked"].includes(c.status) && <Button size="sm" variant="primary" onClick={() => { void submitForReview(c.id).then(saved => { if (saved) toast("Submitted for review."); }); }}>Submit for review</Button>
+        : <>
         <Pill tone={{ none: "faint", ready: "review", in_review: "review", changes_requested: "warn", accepted: "ok" }[c.review]}>{{ none: "Not submitted", ready: "Ready for review", in_review: "In review", changes_requested: "Changes requested", accepted: "Accepted" }[c.review]}</Pill>
-        {(c.ownerId === me?.id || isAdmin) && ["in_progress", "blocked"].includes(c.status) && <Button size="sm" variant="primary" onClick={() => { submitForReview(c.id); toast("Submitted for review. Reviewer and QA notified."); }}>Submit for review</Button>}
+        {(c.ownerId === me?.id || isAdmin) && ["in_progress", "blocked"].includes(c.status) && <Button size="sm" variant="primary" onClick={() => { void submitForReview(c.id).then(saved => { if (saved) toast("Submitted for review."); }); }}>Submit for review</Button>}
         {isReviewer && c.review === "in_review" && <><Button size="sm" icon="check" onClick={() => setNote({ title: "Accept code review", cta: "Accept", run: n => { setReview(c.id, "accepted", n); toast("Review accepted"); } })}>Accept review</Button><Button size="sm" variant="ghost" onClick={() => setNote({ title: "Request changes", cta: "Request changes", required: true, run: n => { setReview(c.id, "changes_requested", n); toast("Changes requested"); } })}>Request changes</Button></>}
       </>}><div style={{ height: 14 }} /></Section>
 
-      <Section title="Acceptance criteria & evidence" sub="Evidence is attached to each criterion and reviewed individually. History is kept for every version." actions={can.ownerOrAdmin(c) && <Button size="sm" icon="plus" onClick={() => setCritOpen(true)}>Add criterion</Button>}>
+      <Section title="Acceptance criteria & evidence" sub={apiMode ? "The backend stores the expected-deliverable text and a QA decision with evidence, but not per-criterion evidence." : "Evidence is attached to each criterion and reviewed individually. History is kept for every version."} actions={!apiMode && can.ownerOrAdmin(c) && <Button size="sm" icon="plus" onClick={() => setCritOpen(true)}>Add criterion</Button>}>
         <div className="panel-body">
-          <div className="row" style={{ gap: 12, marginBottom: 14 }}><div className="progress" style={{ flex: 1 }}><i style={{ width: `${c.criteria.length ? acc / c.criteria.length * 100 : 0}%` }} /></div><span className="muted tnum" style={{ fontSize: 13 }}>{acc}/{c.criteria.length} accepted</span></div>
-          {c.criteria.length === 0 && <Empty icon="readiness" title="No criteria yet">Add measurable criteria so everyone agrees what “done” means.</Empty>}
+          {apiMode && <p>{c.deliverable || "No acceptance criteria are recorded for this component."}</p>}
+          {!apiMode && <div className="row" style={{ gap: 12, marginBottom: 14 }}><div className="progress" style={{ flex: 1 }}><i style={{ width: `${c.criteria.length ? acc / c.criteria.length * 100 : 0}%` }} /></div><span className="muted tnum" style={{ fontSize: 13 }}>{acc}/{c.criteria.length} accepted</span></div>}
+          {!apiMode && c.criteria.length === 0 && <Empty icon="readiness" title="No criteria yet">Add measurable criteria so everyone agrees what “done” means.</Empty>}
           {c.criteria.map(k => (
             <div className="crit" key={k.id}>
               <button className="crit-head" onClick={() => setOpen(open === k.id ? null : k.id)} aria-expanded={open === k.id}>
@@ -442,8 +492,8 @@ function AcceptanceTab({ c }: { c: Component }) {
                   {k.evidence.length === 0 && <span className="muted" style={{ fontSize: 13 }}>No evidence submitted yet.</span>}
                   {[...k.evidence].reverse().map(e => <EvidenceItem key={e.id} c={c} k={k} e={e} canReview={can.reviewOrAdmin(c) && e.by !== me?.id} />)}
                   <div className="row" style={{ gap: 6 }}>
-                    {(c.ownerId === me?.id || isAdmin) && k.status !== "accepted" && <Button size="sm" variant="primary" icon="upload" onClick={() => setEvFor(k)}>Attach evidence</Button>}
-                    {isAdmin && <ConfirmButton label="Remove criterion" confirmText="Remove" onConfirm={() => { removeCriterion(c.id, k.id); toast("Criterion removed"); }} />}
+                    {!apiMode && (c.ownerId === me?.id || isAdmin) && k.status !== "accepted" && <Button size="sm" variant="primary" icon="upload" onClick={() => setEvFor(k)}>Attach evidence</Button>}
+                    {!apiMode && isAdmin && <ConfirmButton label="Remove criterion" confirmText="Remove" onConfirm={() => { removeCriterion(c.id, k.id); toast("Criterion removed"); }} />}
                   </div>
                 </div>
               )}
@@ -452,8 +502,8 @@ function AcceptanceTab({ c }: { c: Component }) {
         </div>
       </Section>
       {note && <NoteModal {...note} onSave={note.run} onClose={() => setNote(null)} />}
-      {evFor && <EvidenceModal c={c} k={evFor} onClose={() => setEvFor(null)} />}
-      {critOpen && <CriterionModal c={c} onClose={() => setCritOpen(false)} />}
+      {!apiMode && evFor && <EvidenceModal c={c} k={evFor} onClose={() => setEvFor(null)} />}
+      {!apiMode && critOpen && <CriterionModal c={c} onClose={() => setCritOpen(false)} />}
     </div>
   );
 }
@@ -550,8 +600,11 @@ function GithubTab({ c }: { c: Component }) {
         <a className="repo-name" href={repo.url} target="_blank" rel="noopener">{repo.org}/{repo.name}</a>
         <Pill tone="faint">{repo.visibility}</Pill>
         <span className="muted" style={{ fontSize: 13 }}>{repo.description}</span>
-        <span style={{ marginLeft: "auto" }} className="row"><Pill tone={CHECK_TONE[repo.ci]} dot>CI {repo.ci}</Pill><span className="muted" style={{ fontSize: 12 }}>{gh.branches.length} branches · {gh.contributors.length} contributors</span></span>
+        <span style={{ marginLeft: "auto" }} className="row"><Pill tone={CHECK_TONE[repo.ci]} dot>CI {repo.ci}</Pill><span className="muted" style={{ fontSize: 12 }}>{repo.githubActivityLoaded === false ? "GitHub metadata not loaded" : `${gh.branches.length} branches · ${gh.contributors.length} contributors`}</span></span>
       </div>
+      {repo.githubActivityLoaded === false ? (
+        <div className="panel-body"><p className="muted">GitHub activity is not included in the repository records loaded from the API.</p></div>
+      ) : <>
       <div style={{ padding: "0 12px" }}><Tabs size="sm" value={sub} onChange={setSub} tabs={[{ id: "readme", label: "README.md", icon: "file" }, { id: "commits", label: "Commits", count: gh.commits.length }, { id: "prs", label: "Pull requests", count: gh.prs.filter(p => p.state === "open").length }, { id: "issues", label: "Issues", count: gh.issues.filter(i => i.state === "open").length }, { id: "checks", label: "Checks", count: gh.runs.length }]} /></div>
       {sub === "readme" && <div className="panel-body"><Markdown src={gh.readme} /></div>}
       {sub === "commits" && <div className="gh-list">{gh.commits.length === 0 && <Empty icon="commit" title="No commits yet" />}{gh.commits.map(x => (
@@ -567,13 +620,14 @@ function GithubTab({ c }: { c: Component }) {
         <div key={r.name} className="gh-item"><Icon name={r.state === "passed" ? "check" : r.state === "failed" ? "x" : "clock"} size={16} style={{ color: r.state === "passed" ? "var(--ok)" : r.state === "failed" ? "var(--crit)" : "var(--fg-4)" }} /><div><span className="t">{r.name}{r.required && <span className="muted" style={{ fontWeight: 400 }}> · required</span>}</span><small>{r.detail ? <span style={{ color: "var(--crit)" }}>{r.detail} · </span> : null}<span className="sha">{r.commit.slice(0, 7)}</span> · {r.duration} · {ago(r.at)}</small></div><Pill tone={CHECK_TONE[r.state]}>{r.state}</Pill></div>
       ))}</div>}
       <div className="sync-note"><Icon name="refresh" size={14} /><span><b>Sample data.</b> In production this tab is read live from GitHub through the Apex GitHub App; GitHub stays the source of truth for code, PRs and checks.</span></div>
+      </>}
     </section>
   );
 }
 
 // ───────────── Architecture (view only) ─────────────
 function ArchitectureTab({ c }: { c: Component }) {
-  const { me, isAdmin, person, addArch, removeArch } = useStore();
+  const { me, isAdmin, apiMode, person, addArch, removeArch } = useStore();
   const { toast } = useToast();
   const [sel, setSel] = useState(c.architecture[0]?.id || null);
   const file = c.architecture.find(a => a.id === sel) || c.architecture[0];
@@ -590,8 +644,8 @@ function ArchitectureTab({ c }: { c: Component }) {
   return (
     <section className="panel" style={{ overflow: "hidden" }}>
       <div className="panel-head" style={{ paddingBottom: 16, borderBottom: "1px solid var(--line)" }}>
-        <div><h2>Architecture</h2><p>View-only. Files can't be downloaded or copied from here; every view is watermarked with the viewer's email.</p></div>
-        {isAdmin && <div className="panel-actions"><input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} /><Button icon="upload" onClick={() => input.current?.click()}>Upload diagram</Button></div>}
+        <div><h2>Architecture</h2><p>{apiMode ? "Architecture file upload is not connected to the backend." : "View-only. Files can't be downloaded or copied from here; every view is watermarked with the viewer's email."}</p></div>
+        {!apiMode && isAdmin && <div className="panel-actions"><input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} /><Button icon="upload" onClick={() => input.current?.click()}>Upload diagram</Button></div>}
       </div>
       {c.architecture.length === 0 ? <Empty icon="image" title="No architecture files yet">{isAdmin ? "Upload a diagram (PNG, JPG, WebP or SVG)." : "An admin can upload diagrams for this component."}</Empty> : (
         <div className="arch">
@@ -601,7 +655,7 @@ function ArchitectureTab({ c }: { c: Component }) {
                 <Icon name="image" size={16} /><span><b>{a.name}</b><small>v{a.version} · {personName(person(a.by))} · {ago(a.at)}</small>{a.note && <small style={{ display: "block" }}>{a.note}</small>}</span>
               </button>
             ))}
-            {isAdmin && file && <div style={{ paddingTop: 8 }}><ConfirmButton label="Remove selected file" confirmText="Remove" onConfirm={() => { removeArch(c.id, file.id); toast("File removed"); }} /></div>}
+            {!apiMode && isAdmin && file && <div style={{ paddingTop: 8 }}><ConfirmButton label="Remove selected file" confirmText="Remove" onConfirm={() => { removeArch(c.id, file.id); toast("File removed"); }} /></div>}
           </div>
           {file && <ProtectedViewer src={file.kind === "svg" ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(file.content) : file.content} mark={`${me?.email} · ${new Date().toLocaleDateString("en-GB")}`} />}
         </div>
@@ -672,14 +726,21 @@ function BlockersTab({ c, onAdd, onAssign }: { c: Component; onAdd: () => void; 
 
 // ───────────── Comments ─────────────
 function CommentsTab({ c }: { c: Component }) {
-  const { me, isAdmin, person, addComment, editComment, deleteComment } = useStore();
+  const { me, isAdmin, apiMode, person, addComment, editComment, deleteComment } = useStore();
   const { toast } = useToast();
   const [body, setBody] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const send = () => { if (!body.trim()) return; addComment(c.id, body.trim()); setBody(""); toast("Comment posted"); };
+  const [sending, setSending] = useState(false);
+  const send = async () => {
+    if (!body.trim() || sending) return;
+    setSending(true);
+    try {
+      if (await addComment(c.id, body.trim())) { setBody(""); toast("Comment posted"); }
+    } finally { setSending(false); }
+  };
   return (
-    <Section title="Discussion" sub="Everyone can comment. Mention someone with @FirstName to notify them.">
+    <Section title="Discussion" sub={apiMode ? "Comments are saved to the backend. Editing and deleting comments are not supported." : "Everyone can comment. Mention someone with @FirstName to notify them."}>
       <div className="panel-body">
         <div className="comments">
           {c.comments.length === 0 && <Empty icon="message" title="No comments yet">Start the discussion about this component.</Empty>}
@@ -688,7 +749,7 @@ function CommentsTab({ c }: { c: Component }) {
               <Avatar p={person(m.by)} size={32} />
               <div style={{ minWidth: 0 }}>
                 <div className="cmt-head"><b>{personName(person(m.by))}</b><small>{fmtDateTime(m.at)}{m.edited && " · edited"}</small>
-                  {(m.by === me?.id || isAdmin) && editing !== m.id && <span className="cmt-actions">{m.by === me?.id && <Button size="sm" variant="ghost" icon="edit" aria-label="Edit comment" onClick={() => { setEditing(m.id); setDraft(m.body); }} />}<ConfirmButton label="" onConfirm={() => { deleteComment(c.id, m.id); toast("Comment deleted"); }} /></span>}
+                  {!apiMode && (m.by === me?.id || isAdmin) && editing !== m.id && <span className="cmt-actions">{m.by === me?.id && <Button size="sm" variant="ghost" icon="edit" aria-label="Edit comment" onClick={() => { setEditing(m.id); setDraft(m.body); }} />}<ConfirmButton label="" onConfirm={() => { deleteComment(c.id, m.id); toast("Comment deleted"); }} /></span>}
                 </div>
                 {editing === m.id ? (
                   <div style={{ display: "grid", gap: 8, marginTop: 6 }}><textarea rows={3} value={draft} onChange={e => setDraft(e.target.value)} aria-label="Edit comment" /><div className="row" style={{ gap: 6 }}><Button size="sm" variant="primary" onClick={() => { if (draft.trim()) { editComment(c.id, m.id, draft.trim()); setEditing(null); } }}>Save</Button><Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button></div></div>
@@ -700,8 +761,8 @@ function CommentsTab({ c }: { c: Component }) {
         <div className="composer">
           <Avatar p={me} size={32} />
           <div className="composer-box">
-            <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write a comment…" aria-label="Write a comment" onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); }} />
-            <div className="composer-foot"><span>Markdown supported · Ctrl/⌘ + Enter to post</span><Button size="sm" variant="primary" onClick={send} disabled={!body.trim()}>Comment</Button></div>
+            <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write a comment…" aria-label="Write a comment" onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(); }} disabled={sending} />
+            <div className="composer-foot"><span>Markdown supported · Ctrl/⌘ + Enter to post</span><Button size="sm" variant="primary" onClick={() => void send()} disabled={!body.trim() || sending}>{sending ? "Posting…" : "Comment"}</Button></div>
           </div>
         </div>
       </div>
@@ -777,12 +838,12 @@ function StartTab({ c }: { c: Component }) {
 }
 
 function NoRepo({ c }: { c: Component }) {
-  const { isAdmin, me } = useStore();
+  const { isAdmin, apiMode, me } = useStore();
   const [open, setOpen] = useState(false);
   const gh = c.links.find(l => l.kind === "github");
   return (
     <Section>
-      <Empty icon="github" title={gh ? "Repository linked" : "No GitHub repository yet"} action={<>{gh && <a className="btn btn-secondary btn-md" href={gh.url} target="_blank" rel="noopener"><Icon name="github" />{gh.label}</a>}{!gh && (isAdmin || c.ownerId === me?.id) && <Button variant="primary" icon="link" onClick={() => setOpen(true)}>Link a repository</Button>}</>}>
+      <Empty icon="github" title={gh ? "Repository linked" : "No GitHub repository yet"} action={<>{gh && <a className="btn btn-secondary btn-md" href={gh.url} target="_blank" rel="noopener"><Icon name="github" />{gh.label}</a>}{!gh && (isAdmin || (!apiMode && c.ownerId === me?.id)) && <Button variant="primary" icon="link" onClick={() => setOpen(true)}>Link a repository</Button>}</>}>
         {gh ? "Commits, pull requests and checks will appear here once the Apex GitHub App is connected." : "When work starts, link the repository here. Commits, pull requests and checks will then show on this page."}
       </Empty>
       {open && <LinkModal c={c} kind="github" onClose={() => setOpen(false)} />}

@@ -1,18 +1,29 @@
 import asyncio, os
 from contextlib import asynccontextmanager
+from pathlib import Path
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from .db import Base, engine, SessionLocal
+from .db import SessionLocal
 from .api import router
-from .config import STATIC_DIR, DESIGNS_DIR
+from .config import STATIC_DIR, DESIGNS_DIR, IS_PRODUCTION
 from .events import set_loop
 from .seed import seed
 
 @asynccontextmanager
 async def lifespan(app):
     set_loop(asyncio.get_running_loop())
-    Base.metadata.create_all(engine)
+    # Migrations run on startup everywhere except production. A production
+    # database is only migrated on purpose: either run `alembic upgrade head`
+    # by hand after a verified backup, or set APEX_AUTO_MIGRATE=1 for that
+    # deploy. Otherwise a routine restart could change a live schema.
+    if not IS_PRODUCTION or os.getenv("APEX_AUTO_MIGRATE") == "1":
+        backend_dir = Path(__file__).resolve().parents[1]
+        alembic_config = Config(str(backend_dir / "alembic.ini"))
+        alembic_config.set_main_option("script_location", str(backend_dir / "alembic"))
+        command.upgrade(alembic_config, "head")
     with SessionLocal() as db: seed(db)
     yield
 

@@ -56,7 +56,7 @@ function Route() {
 }
 
 function Shell() {
-  const { me } = useStore();
+  const { me, apiMode } = useStore();
   const { route } = useNav();
   const [palette, setPalette] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -76,6 +76,9 @@ function Shell() {
       {menu && <div className="side-scrim" onClick={() => setMenu(false)} />}
       <div className="shell-main">
         <Topbar onSearch={() => setPalette(true)} onMenu={() => setMenu(true)} />
+        {apiMode && <div className="sync-note" role="status" style={{ borderRadius: 0 }}>
+          Component fields, owner, reviewer and QA assignments, dependencies, links, comments, blockers, review requests, QA decisions and deployment gates save to the backend. Other workspace sections remain demo data. Per-criterion evidence, handoffs, code-review decisions and architecture uploads are not saved.
+        </div>}
         <main className="page" key={route.startsWith("c-") ? "c" : route}>
           <Boundary resetKey={route}><Route /></Boundary>
         </main>

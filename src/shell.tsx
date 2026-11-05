@@ -63,10 +63,15 @@ export function Intro({ onDone }: { onDone: () => void }) {
 
 // ───────────── Sign in ─────────────
 export function SignIn() {
-  const { state, signIn, register } = useStore();
+  const { state, signIn, register, apiMode, authLoading, authError, authenticate } = useStore();
   const [f, setF] = useState({ first: "", last: "", email: "" });
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [err, setErr] = useState<Record<string, string>>({});
   const [form, setForm] = useState(false);
+  const submitApiLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    void authenticate(credentials.email, credentials.password);
+  };
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const er: Record<string, string> = {};
@@ -98,7 +103,17 @@ export function SignIn() {
       <div className="signin-form">
         <div className="signin-card">
           <h2>Sign in</h2>
-          <p className="signin-lede">Pick an account to look around with. Each one shows the platform from a different seat, and nothing you do is permanent. <b>Reset data</b> in the account menu puts it all back.</p>
+          <p className="signin-lede">{apiMode
+            ? "Sign in with your Apex platform credentials. Account and component data will be loaded from the configured backend."
+            : <>Pick an account to look around with. Each one shows the platform from a different seat, and nothing you do is permanent. <b>Reset data</b> in the account menu puts it all back.</>}</p>
+          {apiMode ? (
+            <form onSubmit={submitApiLogin} style={{ display: "grid", gap: 14 }}>
+              <Field label="Work email"><input type="email" autoComplete="username" required value={credentials.email} onChange={e => setCredentials({ ...credentials, email: e.target.value })} /></Field>
+              <Field label="Password"><input type="password" autoComplete="current-password" required value={credentials.password} onChange={e => setCredentials({ ...credentials, password: e.target.value })} /></Field>
+              {authError && <p role="alert" style={{ color: "var(--crit)", fontSize: 13, margin: 0 }}>{authError}</p>}
+              <Button variant="primary" type="submit" iconRight="arrowRight" disabled={authLoading}>{authLoading ? "Connecting…" : "Sign in"}</Button>
+            </form>
+          ) : <>
           <div className="who-list">
             {demo.map(a => (
               <button key={a.id} className="who" onClick={() => signIn(a.id)}>
@@ -126,6 +141,7 @@ export function SignIn() {
               <p className="muted" style={{ fontSize: 12 }}>New profiles join as members with nothing assigned. Admins can change roles under Team.</p>
             </form>
           )}
+          </>}
         </div>
       </div>
     </div>

@@ -5,11 +5,11 @@ import { Button, PageHeader, Section, Pill, PersonChip, Drawer, KV, Field, Perso
 import { ago, personName, fmtDate, stage, STAGE_LABEL, isDone } from "../logic";
 import type { Repo } from "../types";
 
-const ACCESS_TONE: Record<Repo["access"], string> = { connected: "ok", pending_install: "warn", no_access: "crit", error: "crit" };
-const ACCESS_LABEL: Record<Repo["access"], string> = { connected: "Connected", pending_install: "App install pending", no_access: "No access", error: "Sync error" };
+const ACCESS_TONE: Record<Repo["access"], string> = { connected: "ok", pending_install: "warn", no_access: "crit", error: "crit", unknown: "warn" };
+const ACCESS_LABEL: Record<Repo["access"], string> = { connected: "Connected", pending_install: "App install pending", no_access: "No access", error: "Sync error", unknown: "Not verified" };
 
 export function Repos() {
-  const { state, person } = useStore();
+  const { state, person, apiMode } = useStore();
   const [q, setQ] = useState(""); const [proj, setProj] = useState(""); const [acc, setAcc] = useState(""); const [ci, setCi] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const comps = (r: Repo) => state.components.filter(c => c.repoId === r.id);
@@ -56,10 +56,12 @@ export function Repos() {
                 <td><PersonChip id={r.ownerId} /></td>
                 <td><Pill tone={ACCESS_TONE[r.access]} dot>{ACCESS_LABEL[r.access]}</Pill></td>
                 <td><Pill tone={CHECK_TONE[r.ci]}>{label(r.ci)}</Pill></td>
-                <td className="muted" style={{ whiteSpace: "nowrap" }}>{r.github.commits[0] ? ago(r.github.commits[0].at) : "—"}</td>
+                <td className="muted" style={{ whiteSpace: "nowrap" }}>{r.github.commits[0] ? ago(r.github.commits[0].at) : r.githubActivityLoaded === false ? "Not loaded" : "—"}</td>
               </tr>))}
             </tbody></table></div>}
-        <div className="sync-note" style={{ borderRadius: 0 }}><Icon name="refresh" size={14} /><span><b>Sample data.</b> In production, names, branches, commits and checks sync from GitHub; access status comes from the GitHub App installation.</span></div>
+        <div className="sync-note" style={{ borderRadius: 0 }}><Icon name="refresh" size={14} /><span>{apiMode
+          ? "GitHub activity and access verification are not included in the repository API data."
+          : <><b>Sample data.</b> In production, names, branches, commits and checks sync from GitHub; access status comes from the GitHub App installation.</>}</span></div>
       </section>
       {sel && <RepoDrawer r={sel} onClose={() => setOpen(null)} />}
     </>

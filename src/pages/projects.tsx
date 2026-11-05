@@ -151,7 +151,7 @@ function CommitChart({ dates }: { dates: string[] }) {
 const SECTIONS = [["overview", "Overview"], ["how", "How it works"], ["architecture", "Architecture"], ["delivery", "Delivery"], ["github", "GitHub"], ["components", "Components"]];
 
 export function ProjectPage({ id }: { id: string }) {
-  const { state, person } = useStore();
+  const { state, person, apiMode } = useStore();
   const [repo, setRepo] = useState<string | null>(null);
   const refs = useRef<Record<string, HTMLElement | null>>({});
   const p = state.projects.find(x => x.id === id);
@@ -231,7 +231,7 @@ export function ProjectPage({ id }: { id: string }) {
       </section>
 
       <section className="sec" ref={sec("github")}>
-        <div className="sec-head"><h2>GitHub</h2><span className="sec-note">Sample data · syncs from GitHub in production</span></div>
+        <div className="sec-head"><h2>GitHub</h2><span className="sec-note">{apiMode ? "Activity not loaded from the backend" : "Sample data · syncs from GitHub in production"}</span></div>
         {repos.length === 0 ? <Empty icon="github" title="No repositories linked yet" /> : (
           <div className="gh">
             <div className="gh-repos">
@@ -239,15 +239,15 @@ export function ProjectPage({ id }: { id: string }) {
                 <button key={r.id} className="repo" onClick={() => setRepo(r.id)}>
                   <span className="repo-top"><Icon name="repo" size={15} /><b>{r.name}</b><span className={cx("ci", "ci-" + r.ci)}>{label(r.ci)}</span></span>
                   <span className="repo-desc">{r.description}</span>
-                  <span className="repo-meta"><span>{r.languages.join(" · ")}</span><span>{r.github.prs.filter(x => x.state === "open").length} open PR</span><span>{r.github.commits[0] ? `updated ${ago(r.github.commits[0].at)}` : "no commits"}</span></span>
+                  <span className="repo-meta"><span>{r.languages.join(" · ")}</span><span>{r.githubActivityLoaded === false ? "Activity not loaded" : `${r.github.prs.filter(x => x.state === "open").length} open PR`}</span><span>{r.github.commits[0] ? `updated ${ago(r.github.commits[0].at)}` : r.githubActivityLoaded === false ? "Activity not loaded" : "No commits recorded"}</span></span>
                 </button>
               ))}
             </div>
-            <div className="gh-activity">
+            {apiMode ? <p className="muted">Repository activity is not part of this read integration yet.</p> : <div className="gh-activity">
               <span className="mono-label">Commits · last 4 weeks</span>
               <CommitChart dates={commits.map(c => c.at)} />
               <div className="commits">{commits.slice(0, 6).map(c => <div key={c.sha + c.repo} className="commit"><code>{c.sha.slice(0, 7)}</code><span>{c.message}</span><small>{c.repo} · {ago(c.at)}</small></div>)}</div>
-            </div>
+            </div>}
           </div>
         )}
       </section>
@@ -290,7 +290,7 @@ export function Projects() {
               <button key={r.id} className="rowlink rowlink-4" onClick={() => setRepo(r.id)}>
                 <span className="rowlink-main"><b className="mono">{r.name}</b><small>{r.description}</small></span>
                 <span className="hide-sm muted" style={{ fontSize: 13 }}>{proj || "—"}</span>
-                <span className={cx("ci", "ci-" + (r.access === "connected" ? r.ci : "warn"))}>{r.access === "connected" ? label(r.ci) : r.access === "pending_install" ? "Install pending" : "No access"}</span>
+                <span className={cx("ci", "ci-" + (r.access === "connected" ? r.ci : "warn"))}>{r.access === "connected" ? label(r.ci) : r.access === "pending_install" ? "Install pending" : r.access === "unknown" ? "Not verified" : "No access"}</span>
                 <span className="muted tnum" style={{ fontSize: 12, textAlign: "right" }}>{r.github.commits[0] ? ago(r.github.commits[0].at) : "—"}</span>
               </button>
             );

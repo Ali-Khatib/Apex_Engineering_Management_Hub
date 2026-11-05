@@ -71,21 +71,22 @@ export interface CheckRun { name: string; state: ChecksState; at: string; commit
 
 export interface Repo {
   id: string; name: string; org: string; url: string; description: string;
-  defaultBranch: string; visibility: "private" | "internal" | "public";
+  defaultBranch: string; visibility: "private" | "internal" | "public" | "unknown";
   languages: string[]; frameworks: string[];
   ownerId: string | null; reviewerId: string | null; pmId: string | null;
-  access: "connected" | "pending_install" | "no_access" | "error"; accessNote: string;
+  access: "connected" | "pending_install" | "no_access" | "error" | "unknown"; accessNote: string;
   ci: ChecksState; workflow: string;
   env: { dev: string; staging: string; prod: string };
   build: string; test: string; products: string[]; services: string[];
   createdAt: string;
+  githubActivityLoaded?: boolean;
   github: { readme: string; commits: Commit[]; prs: PullRequest[]; issues: Issue[]; runs: CheckRun[]; branches: string[]; contributors: string[] };
 }
 
 export type BlockerStatus = "open" | "acknowledged" | "in_progress" | "waiting_external" | "escalated" | "resolved" | "closed";
 export interface Blocker {
   id: string; componentId: string; title: string; description: string; category: string;
-  severity: "critical" | "high" | "medium" | "low";
+  severity: "critical" | "high" | "medium" | "low" | "unspecified";
   responsibleId: string | null; reportedBy: string; nextAction: string; target: string;
   status: BlockerStatus; createdAt: string; updatedAt: string; resolvedAt?: string; slack?: string;
 }

@@ -26,6 +26,8 @@ def _user_from_token(token: str, db: Session) -> User:
     u = db.get(User, int(data["sub"]))
     if not u:
         raise HTTPException(401, "Unknown user")
+    if not u.is_active:
+        raise HTTPException(401, "Account is deactivated")
     return u
 
 def current_user(authorization: str = Header(default=""), db: Session = Depends(get_db)) -> User:

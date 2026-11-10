@@ -42,7 +42,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
         <>
           <video className={cx("intro-video", playing && "on")} src={src} muted playsInline autoPlay preload="auto"
             onCanPlay={() => setPlaying(true)} onPlaying={() => setPlaying(true)} onEnded={finish} onError={() => setMode("css")} />
-          <div className={cx("intro-title", playing && "go")}><strong>Apex AI Arabia</strong><span>Engineering Platform</span></div>
+          <div className={cx("intro-title", playing && "go")}><strong>Apex HQ</strong><span>Apex AI Arabia</span></div>
         </>
       ) : (
         <>
@@ -53,7 +53,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
               <span className="intro-sheen" aria-hidden style={{ WebkitMaskImage: `url(${LOGO})`, maskImage: `url(${LOGO})` } as any} />
               {particles.map((p, i) => <span key={i} className="intro-particle" style={{ left: p.left, top: p.top, width: p.size, height: p.size, ["--dx" as any]: p.dx, ["--dy" as any]: p.dy, animationDelay: p.delay }} />)}
             </div>
-            <div className="intro-word"><strong>Apex AI Arabia</strong><span>Engineering Platform</span></div>
+            <div className="intro-word"><strong>Apex HQ</strong><span>Apex AI Arabia</span></div>
           </div>
         </>
       )}
@@ -88,9 +88,9 @@ export function SignIn() {
   return (
     <div className="signin">
       <div className="signin-brand">
-        <div className="signin-logo"><img src={LOGO} alt="" /> Apex AI Arabia</div>
+        <div className="signin-logo"><img src={LOGO} alt="" /> Apex HQ</div>
         <div>
-          <h1>The engineering platform</h1>
+          <h1>Apex HQ</h1>
           <p>Every component Apex is building, who owns it, what it is waiting on, and whether it has passed its checks, QA and deployment approvals.</p>
           <dl className="signin-defs">
             <div><dt>Component</dt><dd>One unit of engineering work, owned by one person. The thing this platform tracks.</dd></div>
@@ -166,7 +166,9 @@ export const NAV = [
     { id: "architecture", label: "Architecture & modules", sub: "SP-01 to SP-20 and how everything fits together", icon: "layers" },
     { id: "repos", label: "Repositories", sub: "Where each component's code lives", icon: "repo" },
     { id: "practices", label: "Best practices", sub: "How we agreed to build", icon: "practices" },
-    { id: "team", label: "Team", sub: "People and what they own", icon: "team" },
+    { id: "constitution", label: "Engineering Constitution", sub: "The rules every engineer and AI builder follows", icon: "shield" },
+    { id: "templates", label: "Component templates", sub: "The structure every component spec follows", icon: "file" },
+    { id: "team", label: "Team", sub: "People, profiles and what they own", icon: "team" },
     { id: "about", label: "About & contacts", sub: "What Apex does, and who to ask", icon: "about" },
   ] },
 ];
@@ -184,10 +186,10 @@ export function Rail({ open, onNavigate }: { open: boolean; onNavigate: () => vo
   const openBl = state.blockers.filter(OPEN_BLOCKER).length;
   return (
     <nav className={cx("side", open && "open")} aria-label="Main">
-      <a href="#home" className="side-brand" onClick={onNavigate}><img src={LOGO} alt="" /><b>Apex AI Arabia</b></a>
+      <a href="#home" className="side-brand" onClick={onNavigate}><img src={LOGO} alt="" /><b>Apex HQ</b></a>
       <div className="side-scope">
         <Icon name="layers" size={15} />
-        <span><b>Engineering platform</b><small>{state.components.length} components · {state.modules.length} modules</small></span>
+        <span><b>Apex AI Arabia engineering</b><small>{state.components.length} components · {state.modules.length} modules</small></span>
       </div>
       <div className="side-scroll">
         {NAV.map(g => (

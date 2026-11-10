@@ -1,5 +1,5 @@
 @echo off
-title Apex Engineering Platform
+title Apex HQ
 cd /d "%~dp0"
 
 where node >nul 2>nul
@@ -11,7 +11,7 @@ if not exist node_modules (
 )
 
 echo.
-echo   Apex Engineering Platform
+echo   Apex HQ
 echo   Opening http://localhost:5173
 echo   Leave this window open. Press Ctrl+C to stop.
 echo.

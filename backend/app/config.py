@@ -12,6 +12,11 @@ ALLOW_SIMULATED_GITHUB = (
     os.getenv("ALLOW_SIMULATED_GITHUB", "0") == "1" and not IS_PRODUCTION
 )
 
+# When on, a component cannot move to done or deployed unless a human reviewer
+# has approved a compliance review of its current Build Contract. Off by default
+# so existing workflows keep working until a team chooses to require it.
+REQUIRE_COMPLIANCE_REVIEW = os.getenv("APEX_REQUIRE_COMPLIANCE_REVIEW", "0") == "1"
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./apex_erp.db")
 
 

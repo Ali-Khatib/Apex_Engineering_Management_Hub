@@ -11,6 +11,7 @@ import { LifecyclePill } from "../ui";
 import { WAVES } from "../seed";
 import { Fact, Missing, Contract, ArchitectureMap, DependencyCard, NextActionBar, BlockerAlarm, YourPart } from "./componentSpec";
 import { EditComponentModal, AssignModal } from "./componentForms";
+import { GovernanceTab } from "./hq";
 import { BlockerModal, BlockerRow, HandoffCard } from "./blockers";
 import { HistoryLine } from "./activity";
 import type { Component, Criterion, Evidence, LinkKind, Status } from "../types";
@@ -51,6 +52,7 @@ export function ComponentPage({ id }: { id: string }) {
     { id: "architecture", label: "Design diagrams", count: c.lib?.diagrams.length || undefined },
     { id: "onboarding", label: "Getting started" },
     { id: "acceptance", label: "Readiness" },
+    { id: "governance", label: "Spec & contract" },
     { id: "github", label: "GitHub" },
     { id: "comments", label: "Discussion", count: c.comments.length || undefined },
   ];
@@ -113,6 +115,7 @@ export function ComponentPage({ id }: { id: string }) {
       {cur === "overview" && <OverviewTab c={c} onTab={setTab} onBlocker={() => setModal("blocker")} />}
       {cur === "onboarding" && (c.lib ? <StartTab c={c} /> : <OnboardingTab c={c} />)}
       {cur === "acceptance" && <AcceptanceTab c={c} />}
+      {cur === "governance" && <GovernanceTab c={c} />}
       {cur === "github" && <GithubTab c={c} />}
       {cur === "architecture" && (c.lib ? <DesignsTab c={c} /> : <ArchitectureTab c={c} />)}
       {cur === "comments" && <div className="stack-v"><CommentsTab c={c} /><Section title="History" sub="Platform and GitHub events, newest first"><div className="panel-body"><div className="feed">{state.history.filter(h => h.entityId === c.id).slice(0, 25).map(h => <HistoryLine key={h.id} h={h} />)}</div></div></Section></div>}

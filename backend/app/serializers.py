@@ -1,10 +1,17 @@
 from datetime import date
 from . import models as m
 
-def user_out(u):
+def user_out(u, private=False):
+    """The public view of a user. `private=True` adds the restricted fields and
+    must only be used for an admin or for the user's own record."""
     if not u: return None
-    return {"id": u.id, "first_name": u.first_name, "last_name": u.last_name, "email": u.email, "role": u.role,
-            "title": u.title, "onboarding_notes": u.onboarding_notes}
+    d = {"id": u.id, "first_name": u.first_name, "last_name": u.last_name, "email": u.email, "role": u.role,
+         "title": u.title, "designation": u.title, "onboarding_notes": u.onboarding_notes,
+         "department": u.department or "", "github_id": u.github_id or "", "website_url": u.website_url or "",
+         "is_active": bool(u.is_active), "created_at": u.created_at, "updated_at": u.updated_at}
+    if private:
+        d.update({"phone": u.phone or "", "linkedin_url": u.linkedin_url or "", "vpn_id": u.vpn_id or ""})
+    return d
 
 def repo_out(r):
     if not r: return None

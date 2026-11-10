@@ -21,6 +21,7 @@ import { Settings } from "./pages/settings";
 import { QA } from "./pages/qa";
 import { Knowledge } from "./pages/knowledge";
 import { Architecture } from "./pages/architecture";
+import { Constitution, Templates } from "./pages/hq";
 
 class Boundary extends React.Component<{ children: React.ReactNode; resetKey: string }, { err: Error | null }> {
   state = { err: null as Error | null };
@@ -51,6 +52,8 @@ function Route() {
     case "practices": return <Practices />;
     case "about": return <About />;
     case "team": return <Team />;
+    case "constitution": return <Constitution />;
+    case "templates": return <Templates />;
     default: return <Home />;
   }
 }
@@ -77,7 +80,7 @@ function Shell() {
       <div className="shell-main">
         <Topbar onSearch={() => setPalette(true)} onMenu={() => setMenu(true)} />
         {apiMode && <div className="sync-note" role="status" style={{ borderRadius: 0 }}>
-          Component fields, owner, reviewer and QA assignments, dependencies, links, comments, blockers, review requests, QA decisions and deployment gates save to the backend. Other workspace sections remain demo data. Per-criterion evidence, handoffs, code-review decisions and architecture uploads are not saved.
+          Component fields, owner, reviewer and QA assignments, dependencies, links, comments, blockers, review requests, QA decisions and deployment gates save to the backend. The Engineering Constitution, component templates, specifications, AI Build Contracts and compliance reviews are stored and checked by the backend. Other workspace sections remain demo data. Per-criterion evidence, handoffs, code-review decisions and architecture uploads are not saved.
         </div>}
         <main className="page" key={route.startsWith("c-") ? "c" : route}>
           <Boundary resetKey={route}><Route /></Boundary>

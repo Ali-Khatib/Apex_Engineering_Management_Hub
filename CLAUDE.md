@@ -1,4 +1,4 @@
-# Apex Engineering Management Hub
+# Apex HQ (formerly the Apex Engineering Management Hub)
 
 ## Attribution
 

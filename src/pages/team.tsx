@@ -4,8 +4,15 @@ import { Icon } from "../icons";
 import { Button, PageHeader, Section, Pill, Avatar, Modal, Field, ConfirmButton, CopyText, Empty, cx } from "../ui";
 import { personName, isDone, risk, fmtDate } from "../logic";
 import type { Person, Role } from "../types";
+import { PeopleDirectory } from "./hq";
 
+/** With a backend the directory is the server's: full profiles, private fields and deactivation. */
 export function Team() {
+  const { apiMode } = useStore();
+  return apiMode ? <PeopleDirectory /> : <DemoTeam />;
+}
+
+function DemoTeam() {
   const { state, me, isAdmin, updatePerson, removePerson } = useStore();
   const { toast } = useToast();
   const [q, setQ] = useState("");

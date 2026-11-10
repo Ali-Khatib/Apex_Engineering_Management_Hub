@@ -6,12 +6,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
-from . import models as m, serializers as s, github as gh
+from . import models as m, serializers as s, github as gh, profiles
 from .db import get_db
 from .security import current_user, require_admin, verify_password, hash_password, make_token, _user_from_token
 from .services import audit, notify, admin_ids, open_blockers
 from .events import stream, publish
 from .config import ALLOW_SIMULATED_GITHUB, ORG_LINKS
+from . import governance_service as gsvc
 
 router = APIRouter(prefix="/api")
 STATUSES = ["proposed", "in_progress", "in_review", "blocked", "done", "deployed"]
@@ -34,41 +35,110 @@ class Login(BaseModel): email: str; password: str
 def login(b: Login, db: Session = Depends(get_db)):
     u = db.scalar(select(m.User).where(m.User.email == b.email.lower().strip()))
     if not u or not verify_password(b.password, u.password_hash): raise HTTPException(401, "Invalid credentials")
-    return {"token": make_token(u), "user": s.user_out(u)}
+    if not u.is_active: raise HTTPException(403, "This account is deactivated. Ask an admin.")
+    return {"token": make_token(u), "user": s.user_out(u, private=True)}
 
 @router.get("/config")
 def config(_=Depends(current_user)): return {"links": ORG_LINKS}
 
 @router.get("/me")
-def me(u: m.User = Depends(current_user)): return s.user_out(u)
+def me(u: m.User = Depends(current_user)): return s.user_out(u, private=True)
 
 class NewUser(BaseModel):
-    first_name: str; last_name: str; email: str; role: str = "member"; password: str = "ChangeMe123!"
-    title: str = ""; onboarding_notes: str = ""
+    first_name: str = ""; last_name: str = ""; designation: str = ""; department: str = ""
+    email: str = ""; phone: str = ""; linkedin_url: str = ""; vpn_id: str = ""
+    github_id: str = ""; website_url: str = ""
+    role: str = "member"; password: str = ""; onboarding_notes: str = ""
 class UserPatch(BaseModel):
-    first_name: str | None = None; last_name: str | None = None; role: str | None = None; title: str | None = None; onboarding_notes: str | None = None
+    first_name: str | None = None; last_name: str | None = None; designation: str | None = None
+    title: str | None = None  # older name for designation, still accepted
+    department: str | None = None; email: str | None = None; phone: str | None = None
+    linkedin_url: str | None = None; vpn_id: str | None = None; github_id: str | None = None
+    website_url: str | None = None; role: str | None = None; onboarding_notes: str | None = None
+class SelfPatch(BaseModel):
+    phone: str | None = None; linkedin_url: str | None = None; github_id: str | None = None; website_url: str | None = None
+
+def _clean_profile(data: dict, creating: bool) -> dict:
+    try: return profiles.clean_profile(data, creating)
+    except profiles.ProfileError as e: raise HTTPException(422, {"message": "Invalid profile", "fields": e.errors})
+
+def _apply_profile(u: m.User, clean: dict):
+    for k, v in clean.items(): setattr(u, "title" if k == "designation" else k, v)
+
+def _active_admins(db) -> int:
+    return db.scalar(select(func.count()).select_from(m.User).where(m.User.role == "admin", m.User.is_active == True)) or 0  # noqa
 
 @router.get("/users")
-def users(db: Session = Depends(get_db), _=Depends(current_user)):
-    return [s.user_out(u) for u in db.scalars(select(m.User).order_by(m.User.first_name))]
+def users(include_inactive: bool = False, db: Session = Depends(get_db), me=Depends(current_user)):
+    """Public directory. Private fields (phone, VPN ID, LinkedIn) are never in this list."""
+    q = select(m.User).order_by(m.User.first_name)
+    if not (include_inactive and me.role == "admin"): q = q.where(m.User.is_active == True)  # noqa
+    return [s.user_out(u) for u in db.scalars(q)]
+
+@router.get("/users/{uid}")
+def get_user(uid: int, db: Session = Depends(get_db), me=Depends(current_user)):
+    u = db.get(m.User, uid)
+    if not u: raise HTTPException(404, "User not found")
+    if not u.is_active and me.role != "admin": raise HTTPException(404, "User not found")
+    private = me.role == "admin" or me.id == u.id
+    if private and me.id != u.id:
+        audit(db, me, "user.view_private", u.email); db.commit()
+    return s.user_out(u, private=private)
+
+@router.patch("/me")
+def patch_me(b: SelfPatch, db: Session = Depends(get_db), me=Depends(current_user)):
+    """People maintain their own contact details. Role, email, department, designation and VPN ID stay with admins."""
+    data = b.model_dump(exclude_unset=True)
+    clean = _clean_profile(data, False)
+    _apply_profile(me, clean); audit(db, me, "user.update_self", ", ".join(sorted(clean))); db.commit()
+    return s.user_out(me, private=True)
 
 @router.post("/users", status_code=201)
 def create_user(b: NewUser, db: Session = Depends(get_db), admin=Depends(require_admin)):
     if b.role not in ("admin", "member"): raise HTTPException(422, "role must be admin|member")
-    if db.scalar(select(m.User).where(m.User.email == b.email.lower())): raise HTTPException(409, "Email already registered")
-    u = m.User(first_name=b.first_name, last_name=b.last_name, email=b.email.lower(), role=b.role, title=b.title,
-               onboarding_notes=b.onboarding_notes, password_hash=hash_password(b.password))
-    db.add(u); audit(db, admin, "user.create", u.email); db.commit(); return s.user_out(u)
+    clean = _clean_profile(b.model_dump(), True)
+    # No default password: a shared default would be a credential in the source.
+    if len(b.password) < 12: raise HTTPException(422, {"message": "Invalid profile", "fields": {"password": "Set an initial password of at least 12 characters"}})
+    if db.scalar(select(m.User).where(m.User.email == clean["email"])): raise HTTPException(409, "Email already registered")
+    u = m.User(role=b.role, onboarding_notes=b.onboarding_notes, password_hash=hash_password(b.password))
+    _apply_profile(u, clean)
+    db.add(u); audit(db, admin, "user.create", u.email); db.commit(); return s.user_out(u, private=True)
 
 @router.patch("/users/{uid}")
 def patch_user(uid: int, b: UserPatch, db: Session = Depends(get_db), admin=Depends(require_admin)):
     u = db.get(m.User, uid)
     if not u: raise HTTPException(404, "User not found")
-    data = b.model_dump(exclude_none=True)
-    if data.get("role") and data["role"] not in ("admin", "member"): raise HTTPException(422, "role must be admin|member")
-    if u.id == admin.id and data.get("role") == "member": raise HTTPException(409, "Admins cannot demote themselves")
-    for k, v in data.items(): setattr(u, k, v)
-    audit(db, admin, "user.update", f"{u.email}: {data}"); db.commit(); return s.user_out(u)
+    data = b.model_dump(exclude_unset=True)
+    if "title" in data and "designation" not in data: data["designation"] = data.pop("title")
+    data.pop("title", None)
+    role = data.pop("role", None); notes = data.pop("onboarding_notes", None)
+    if role is not None and role not in ("admin", "member"): raise HTTPException(422, "role must be admin|member")
+    if u.id == admin.id and role == "member": raise HTTPException(409, "Admins cannot demote themselves")
+    if role == "member" and u.role == "admin" and u.is_active and _active_admins(db) <= 1: raise HTTPException(409, "At least one active admin is required")
+    clean = _clean_profile(data, False)
+    if "email" in clean and clean["email"] != u.email and db.scalar(select(m.User).where(m.User.email == clean["email"])): raise HTTPException(409, "Email already registered")
+    _apply_profile(u, clean)
+    if role is not None: u.role = role
+    if notes is not None: u.onboarding_notes = notes
+    changed = sorted(clean) + (["role"] if role is not None else []) + (["onboarding_notes"] if notes is not None else [])
+    audit(db, admin, "user.update", f"{u.email}: {', '.join(changed)}"); db.commit(); return s.user_out(u, private=True)
+
+@router.post("/users/{uid}/deactivate")
+def deactivate_user(uid: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    """Accounts are kept, not deleted: components, comments and the audit trail refer to them."""
+    u = db.get(m.User, uid)
+    if not u: raise HTTPException(404, "User not found")
+    if u.id == admin.id: raise HTTPException(409, "You cannot deactivate your own account")
+    if u.role == "admin" and u.is_active and _active_admins(db) <= 1: raise HTTPException(409, "At least one active admin is required")
+    u.is_active = False; audit(db, admin, "user.deactivate", u.email); db.commit()
+    return s.user_out(u, private=True)
+
+@router.post("/users/{uid}/reactivate")
+def reactivate_user(uid: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    u = db.get(m.User, uid)
+    if not u: raise HTTPException(404, "User not found")
+    u.is_active = True; audit(db, admin, "user.reactivate", u.email); db.commit()
+    return s.user_out(u, private=True)
 
 # ---------------- components ----------------
 @router.get("/components")
@@ -157,11 +227,17 @@ def patch_component(cid: int, b: CompPatch, db: Session = Depends(get_db), user=
             data.get("reviewer_id", c.reviewer_id),
             data.get("qa_id", c.qa_id),
         )
+    for key in ("owner_id", "reviewer_id", "qa_id"):
+        if data.get(key) and data[key] != getattr(c, key) and not db.get(m.User, data[key]).is_active:
+            raise HTTPException(422, f"{key.removesuffix('_id')} is a deactivated account")
     if user.role != "admin":
         # members: owner may only move status (never to deployed) and update docs/spec text
         allowed = {"status", "docs_md", "spec_md", "architecture_md"}
         if c.owner_id != user.id or set(data) - allowed: raise HTTPException(403, "Only admins can edit this; owners may edit status and docs")
         if data.get("status") == "deployed": raise HTTPException(403, "Only admins can mark deployed")
+    if data.get("status") in ("done", "deployed") and c.status != data["status"]:
+        blocked = gsvc.completion_blocked(db, c)
+        if blocked: raise HTTPException(409, blocked)
     if data.get("status") == "deployed" and not c.gate_ready_for_deploy: raise HTTPException(409, "Cannot deploy: ready_for_deploy gate not set")
     changes = []
     for k, v in data.items():
@@ -178,7 +254,7 @@ def patch_component(cid: int, b: CompPatch, db: Session = Depends(get_db), user=
 def delete_component(cid: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
     c = _comp(db, cid); audit(db, admin, "component.delete", f"{c.code} {c.name}")
     db.query(m.Dependency).filter(or_(m.Dependency.component_id == cid, m.Dependency.depends_on_id == cid)).delete()
-    for M in (m.Comment, m.Acceptance, m.Blocker, m.ChecklistItem): db.query(M).filter(M.component_id == cid).delete()
+    for M in (m.Comment, m.Acceptance, m.Blocker, m.ChecklistItem, m.ComponentSpec, m.ComplianceReview): db.query(M).filter(M.component_id == cid).delete()
     db.delete(c); db.commit(); publish("component", {"id": cid})
 
 # ---------------- comments, acceptance, gates, blockers, checklist ----------------
@@ -199,6 +275,9 @@ def accept(cid: int, b: AcceptIn, db: Session = Depends(get_db), user=Depends(cu
     if c.owner_id == user.id and user.role != "admin": raise HTTPException(403, "Owners cannot accept their own component")
     if c.qa_id and user.id != c.qa_id and user.role != "admin": raise HTTPException(403, "Assigned QA or admin only")
     if b.decision == "accepted" and not (b.evidence.strip() or b.evidence_url.strip()): raise HTTPException(422, "Acceptance requires evidence (text or link)")
+    if b.decision == "accepted" and c.status == "in_review":
+        blocked = gsvc.completion_blocked(db, c)
+        if blocked: raise HTTPException(409, blocked)
     a = m.Acceptance(component_id=cid, reviewer_id=user.id, **b.model_dump()); db.add(a)
     c.gate_qa_accepted = b.decision == "accepted"
     if b.decision == "accepted":

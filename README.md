@@ -1,4 +1,6 @@
-# Apex Engineering Management Hub
+# Apex HQ
+
+Apex HQ is the product formerly called the Apex Engineering Management Hub.
 
 An internal engineering workspace for **Apex AI Arabia** — what the company is building, who owns each piece, what is stuck, and whether it is ready to ship.
 
@@ -56,3 +58,7 @@ src/
   pages/          one file per screen
   data/           the component design library, 20 October 2026
 ```
+
+## Governance and people
+
+Templates, the Engineering Constitution, AI Build Contracts, compliance reviews and the user directory are described in [docs/apex-hq-governance.md](docs/apex-hq-governance.md).

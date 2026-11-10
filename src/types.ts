@@ -1,4 +1,4 @@
-// Domain model for the Apex Engineering Platform.
+// Domain model for Apex HQ.
 // In production these map 1:1 to Postgres tables (see brief §12); here they live in a local store.
 
 export type Role = "admin" | "member";

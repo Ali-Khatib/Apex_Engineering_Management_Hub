@@ -13,8 +13,21 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     role: Mapped[str] = mapped_column(String(10), default="member")  # admin | member
     password_hash: Mapped[str] = mapped_column(String(300))
-    title: Mapped[str] = mapped_column(String(120), default="")
+    title: Mapped[str] = mapped_column(String(120), default="")  # shown as "Designation"
     onboarding_notes: Mapped[str] = mapped_column(Text, default="")
+    # Profile fields. Rows that existed before these columns carry NULL and the
+    # serializer shows them as empty; the API requires them on create.
+    department: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(40), nullable=True)           # private
+    linkedin_url: Mapped[str | None] = mapped_column(String(400), nullable=True)   # private
+    vpn_id: Mapped[str | None] = mapped_column(String(80), nullable=True)          # private
+    github_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    # Accounts are deactivated, never deleted: components, comments and the
+    # audit log point at them.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=now, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=now, onupdate=now, nullable=True)
 
 class Repository(Base):
     __tablename__ = "repositories"
@@ -227,3 +240,77 @@ class ComponentProvenance(Base):
     # review. Recorded here so the frontend can say so without inferring it.
     library_state: Mapped[str] = mapped_column(String(80), default="Design proposal - architecture review required")
     imported_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class ComponentTemplate(Base):
+    """Head row of a reusable component specification template.
+
+    The sections live in immutable ComponentTemplateVersion rows. Editing a
+    template appends a version, so a component can always say which version of
+    the template it was written against.
+    """
+    __tablename__ = "component_templates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+class ComponentTemplateVersion(Base):
+    __tablename__ = "component_template_versions"
+    __table_args__ = (UniqueConstraint("template_id", "version"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    template_id: Mapped[int] = mapped_column(ForeignKey("component_templates.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    sections: Mapped[list] = mapped_column(JSON, default=list)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+class ComponentSpec(Base):
+    """Structured specification text for sections that have no component column.
+
+    Sections that already live on the component (description, architecture,
+    API spec, acceptance criteria, docs) stay there; see governance.LEGACY_COLUMNS.
+    """
+    __tablename__ = "component_specs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    component_id: Mapped[int] = mapped_column(ForeignKey("components.id", ondelete="CASCADE"), unique=True)
+    template_id: Mapped[int | None] = mapped_column(ForeignKey("component_templates.id"), nullable=True)
+    template_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+class ConstitutionVersion(Base):
+    """Append-only. The highest version is the one in force."""
+    __tablename__ = "constitution_versions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, unique=True)
+    rules: Mapped[list] = mapped_column(JSON, default=list)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+class ComplianceReview(Base):
+    """An advisory evaluation of one component against its Build Contract.
+
+    It becomes binding only when a human reviewer approves it.
+    """
+    __tablename__ = "compliance_reviews"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    component_id: Mapped[int] = mapped_column(ForeignKey("components.id", ondelete="CASCADE"), index=True)
+    contract_hash: Mapped[str] = mapped_column(String(64))
+    constitution_version: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), default="advisory")  # advisory | approved | rejected
+    checks: Mapped[list] = mapped_column(JSON, default=list)
+    criteria: Mapped[list] = mapped_column(JSON, default=list)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    decided_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decision_note: Mapped[str] = mapped_column(Text, default="")

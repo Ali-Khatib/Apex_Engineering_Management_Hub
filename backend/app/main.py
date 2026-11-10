@@ -8,6 +8,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from .db import SessionLocal
 from .api import router
+from .governance_api import router as governance_router
+from .governance_service import seed_governance
 from .config import STATIC_DIR, DESIGNS_DIR
 from .events import set_loop
 from .seed import seed
@@ -24,10 +26,12 @@ async def lifespan(app):
         alembic_config = Config(str(backend_dir / "alembic.ini"))
         alembic_config.set_main_option("script_location", str(backend_dir / "alembic"))
         command.upgrade(alembic_config, "head")
-    with SessionLocal() as db: seed(db)
+    with SessionLocal() as db:
+        seed(db)
+        seed_governance(db)
     yield
 
-app = FastAPI(title="Apex Engineering Management Platform", version="0.1-mvp", lifespan=lifespan)
+app = FastAPI(title="Apex HQ", version="0.2", lifespan=lifespan)
 app.include_router(router)
 
 @app.get("/api/health")

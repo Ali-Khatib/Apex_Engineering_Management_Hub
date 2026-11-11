@@ -66,7 +66,7 @@ export function Constitution() {
             actions={view ? <Button size="sm" variant="ghost" onClick={() => setView(null)}>Back to current</Button> : undefined}>
             <RuleGroup title="Engineering rules" rules={core} />
             {slop.length > 0 && <RuleGroup title="AI slop blockers" tone="slop" rules={slop}
-              intro="Company-wide. They apply to every engineer and every AI builder on every component, on top of the rules above." />}
+              intro="Company-wide and non-negotiable. These apply to every engineer and every AI builder on every component, in addition to the engineering rules above." />}
             {apiMode && live.loading && <div className="panel-body muted">Loading…</div>}
           </Section>
         </div>

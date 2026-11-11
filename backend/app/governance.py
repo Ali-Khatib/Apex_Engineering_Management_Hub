@@ -54,18 +54,18 @@ def constitution_rules_v1() -> list[dict]:
 GROUP_CORE, GROUP_SLOP = "core", "ai_slop"
 RULE_GROUPS = (GROUP_CORE, GROUP_SLOP)
 AI_SLOP_BLOCKERS = [
-    "No filler. Never ship placeholder text, lorem ipsum, TODO stubs, invented sample data or mocked responses as real behaviour. Anything unfinished is labelled unfinished.",
-    "No invented references. Never use an API, function, package, version, config key, file or document you have not confirmed exists in this repository or its lockfile.",
-    "No decorative code. No comments that restate the code, dead code, unused parameters, speculative features or wrapper layers the component does not need.",
-    "No swallowed failures. Never catch and ignore an error, return fake success, or silence a failing test, lint or type check to make output look green.",
-    "No theatre tests. A test must fail when the behaviour it covers breaks. No always-true assertions, no tests that only mock the thing under test, and no tests deleted, skipped or loosened to get a pass.",
-    "No unverifiable claims. Words such as works, complete, fixed or production-ready need the command and result that prove them in the same report.",
-    "No generic output. Copy, UI text, documentation and commit messages must be specific to this component. Nothing that could be pasted unchanged into another component.",
-    "No unrequested rewrites. Change only what the component needs. Do not reformat, rename, restructure or modernise unrelated code, and keep the diff reviewable.",
-    "No duplicated logic. Reuse the module that already exists instead of writing a second copy of it.",
-    "No unvetted dependencies. Add a package only when unavoidable, after confirming it exists, is maintained and is needed.",
-    "No silent guessing. When a requirement is missing or ambiguous, stop and ask, or record the assumption in the report. Never fill the gap with a plausible guess.",
-    "No unread output. The owner must have read and understood every AI-written change, and be able to explain it, before review is requested.",
+    "Placeholder content is prohibited. No placeholder text, lorem ipsum, TODO stub, invented sample data or mocked response shall be delivered as working behaviour. Unfinished work shall be identified as unfinished.",
+    "Unverified references are prohibited. No API, function, package, version, configuration key, file or document shall be used unless its existence has been confirmed in this repository or its lockfile.",
+    "Unnecessary code is prohibited. Comments that restate the code, dead code, unused parameters, speculative features and superfluous wrapper layers shall not be introduced.",
+    "Failures shall not be concealed. Errors shall not be caught and ignored, failure shall not be reported as success, and no failing test, lint or type check shall be silenced to produce a passing result.",
+    "Tests shall be meaningful. Each test shall fail when the behaviour it covers is broken. Always-true assertions, tests that mock only the subject under test, and tests deleted, skipped or weakened to obtain a pass are prohibited.",
+    "Claims shall be evidenced. A statement that work is complete, working, fixed or production-ready shall be accompanied, in the same report, by the command and result that substantiate it.",
+    "Output shall be specific. Copy, interface text, documentation and commit messages shall be specific to the component. Content that could be reused unchanged on another component is not acceptable.",
+    "Changes shall be confined. Only what the component requires shall be modified. Unrelated code shall not be reformatted, renamed, restructured or modernised, and every change shall remain reviewable.",
+    "Existing logic shall be reused. Logic that already exists in the codebase shall be reused and not reimplemented.",
+    "Dependencies shall be vetted. A package shall be added only where unavoidable, and only after its existence, maintenance status and necessity have been confirmed.",
+    "Gaps shall be raised, not guessed. Where a requirement is missing or ambiguous, work shall pause for clarification, or the assumption shall be recorded in the report. A plausible guess shall not fill the gap.",
+    "Every change shall be understood. The owner shall have read and understood each AI-written change, and shall be able to explain it, before review is requested.",
 ]
 
 
@@ -116,31 +116,31 @@ DEFAULT_TEMPLATE_NAME = "Apex Component Engineering Spec"
 # is owned by admins, versioned with the template, and a component cannot edit
 # or remove it; a component can only add its own specifics beside it. Drafted
 # as proposed defaults for Apex admins to review.
-AI_BASELINE_BOILERPLATE = """Before writing code
-- Read this specification in full, then the existing code, tests and documentation for this component and the components it depends on. Do not work from memory or from a guess about what the code probably looks like.
-- List what already exists that you will reuse. Prefer the existing module, helper or pattern over a new one.
-- Write down your assumptions and open questions. Ask before guessing. A recorded assumption is acceptable; a silent one is not.
+AI_BASELINE_BOILERPLATE = """Prior to implementation
+- Read this specification in full, followed by the existing code, tests and documentation for this component and the components on which it depends. Do not rely on recollection or on assumptions about the code.
+- Identify the existing modules, helpers and patterns that will be reused, and prefer them to new constructs.
+- Record all assumptions and open questions. Seek clarification before guessing: a recorded assumption is acceptable; an unstated assumption is not.
 
-While building
-- Stay inside this component's scope. If a file outside it must change, say which and why before changing it.
-- Match the project's structure, naming, error handling and test style.
-- Add a dependency only when unavoidable, and only after confirming the package and version exist.
+During implementation
+- Remain within the scope of this component. Where a file outside that scope must change, state which file and why before changing it.
+- Conform to the structure, naming, error handling and test style of the project.
+- Add a dependency only where unavoidable, and only after confirming that the package and version exist.
 
-Before you say it is done
-- Run the build, tests, lint and type checks that apply, and report the commands with their results.
-- Mark every acceptance criterion met, not met or unknown, with the evidence for each.
-- Update the documentation this change affects.
-- Report what you did not do, what you could not verify and what you assumed."""
+Prior to declaring the work complete
+- Run the build, tests, lint and type checks that apply, and report each command together with its result.
+- Mark every acceptance criterion as met, not met or unknown, and supply the evidence for each.
+- Update the documentation affected by the change.
+- Report what was not done, what could not be verified and what was assumed."""
 
-SLOP_DEFENDER_BOILERPLATE = """Before you hand work back, check your own output. Reject it and fix it if any of these is true:
-- It contains placeholder or sample content (lorem ipsum, TODO, example.com, hard-coded fake records, stubbed functions) that your report does not call out as unfinished.
-- It names a function, endpoint, package, config key, file or document you did not confirm exists.
-- A test would still pass if the feature were broken, or a test was removed, skipped or loosened to get a pass.
+SLOP_DEFENDER_BOILERPLATE = """Before returning any work, review your own output against the conditions below. If any condition applies, the output shall be rejected and corrected.
+- It contains placeholder or sample content (lorem ipsum, TODO, example.com, hard-coded fictitious records, stubbed functions) that the report does not identify as unfinished.
+- It refers to a function, endpoint, package, configuration key, file or document whose existence has not been confirmed.
+- A test would still pass if the feature were broken, or a test was removed, skipped or weakened to obtain a pass.
 - An error is caught and ignored, or a failure path returns success.
-- A comment, name or message only restates the code, or could be pasted unchanged into another component.
-- The diff touches code unrelated to this component, or reformats code you had no need to change.
-- Your report says works, complete or production-ready without naming the command or evidence behind it.
-Any component-specific slop listed under this component is a blocker too. Report each defence you applied and each one you could not."""
+- A comment, name or message merely restates the code, or could be reused unchanged on another component.
+- The change touches code unrelated to this component, or reformats code that did not require it.
+- The report states that the work is working, complete or production-ready without naming the command or evidence that supports it.
+Any slop listed below for this specific component is likewise a blocker. The report shall state each defence applied and each defence that could not be applied."""
 
 LEGACY_DEFAULT_KEYS = ["purpose", "functional_requirements", "technical_architecture", "api_contracts", "dependencies",
                        "guardrails", "acceptance_criteria", "testing_requirements", "documentation_refs", "ai_instructions"]
@@ -167,7 +167,7 @@ DEFAULT_SECTIONS = [
      "hint": "What a builder must know about this component first: files to read, commands to run, conventions. Added to the template baseline.",
      "boilerplate": AI_BASELINE_BOILERPLATE},
     {"key": "slop_defender", "label": "Component AI slop defender", "required": False,
-     "hint": "Slop likely on THIS component, one per line, such as invented fields for this API or fake rows on this screen. Added to the template defender.",
+     "hint": "Slop specific to THIS component, one item per line, such as invented fields for this API or fictitious rows on this screen. Added to the template defender.",
      "boilerplate": SLOP_DEFENDER_BOILERPLATE},
     {"key": "ai_instructions", "label": "Component-specific AI instructions", "required": False,
      "hint": "Extra guidance for an AI builder. It cannot override the Constitution or permissions."},

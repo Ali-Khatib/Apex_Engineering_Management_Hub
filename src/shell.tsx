@@ -196,7 +196,7 @@ export function Rail({ open, onNavigate }: { open: boolean; onNavigate: () => vo
           <div className="side-group" key={g.group}>
             <span className="side-label">{g.group}</span>
             {g.items.map(it => (
-              <a key={it.id} href={"#" + it.id} className={cx("side-item", base === it.id && "on")} onClick={onNavigate} aria-current={base === it.id ? "page" : undefined} title={it.sub}>
+              <a key={it.id} href={"#" + it.id} className={cx("side-item", base === it.id && "on", it.id === "constitution" && "hq-breathe")} onClick={onNavigate} aria-current={base === it.id ? "page" : undefined} title={it.sub}>
                 <Icon name={it.icon} size={16} /><span className="side-text">{it.label}</span>
                 {it.id === "blockers" && openBl > 0 && <i className="side-count hot">{openBl}</i>}
               </a>

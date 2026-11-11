@@ -157,6 +157,17 @@ def test_build_contract_separates_trusted_rules_from_component_content(c, H, com
     assert "password" not in str(k).lower()
     assert c.get(f"/api/components/{comp}/build-contract?format=xml", headers=H["M"]).status_code == 422
 
+def test_every_contract_carries_the_slop_blockers_and_the_template_defender(c, H, comp):
+    const = c.get("/api/constitution", headers=H["M"]).json()
+    assert [r for r in const["rules"] if r.get("group") == "ai_slop"], "the company-wide AI slop blockers are part of the Constitution"
+    c.put(f"/api/components/{comp}/spec", json={"sections": {"slop_defender": "Do not invent fields for this API."}}, headers=H["A"])
+    k = c.get(f"/api/components/{comp}/build-contract?format=prompt", headers=H["M"]).json()
+    keys = {b["key"] for b in k["trusted"]["template_baseline"]}
+    assert {"ai_baseline", "slop_defender"} <= keys
+    head = k["prompt"].split("<component_content>")[0]
+    assert "AI slop blockers" in head and "Component AI slop defender" in head
+    assert "Do not invent fields" not in head and "Do not invent fields" in k["prompt"]
+
 def test_incomplete_contract_says_what_is_missing(c, H, comp):
     k = c.get(f"/api/components/{comp}/build-contract", headers=H["A"]).json()
     assert not k["complete"] and "guardrails" in k["missing_required_sections"]

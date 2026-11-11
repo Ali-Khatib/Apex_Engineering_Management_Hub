@@ -31,7 +31,7 @@ const useLoad = <T,>(fn: () => Promise<T>, deps: React.DependencyList) => {
 };
 
 const DemoNote = ({ what }: { what: string }) => (
-  <div className="hq-note" role="status"><Icon name="info" size={15} /><span>Demo copy. {what} needs the backend, so nothing here can be changed or saved until one is connected.</span></div>
+  <div className="hq-note" role="status"><Icon name="info" size={15} /><span>Demo copy. {what} Nothing here can be changed or saved until the backend is connected.</span></div>
 );
 const ErrorNote = ({ msg, onRetry }: { msg: string; onRetry?: () => void }) => (
   <div className="hq-note hq-note-crit" role="alert"><Icon name="alert" size={15} /><span>{msg}</span>{onRetry && <Button size="sm" variant="ghost" onClick={onRetry}>Try again</Button>}</div>
@@ -50,22 +50,26 @@ export function Constitution() {
 
   const rules = apiMode ? live.data?.rules ?? [] : G.DEMO_CONSTITUTION;
   const shown = view && old.data ? old.data.rules : rules;
+  const slop = shown.filter(r => r.group === "ai_slop");
+  const core = shown.filter(r => r.group !== "ai_slop");
   return (
     <>
       <PageHeader eyebrow="Governance" title="Apex Engineering Constitution"
         sub="The rules every engineer and every AI coding agent follows on every component. The server writes them into each AI Build Contract. Nothing a component says can change them."
         actions={apiMode && isAdmin && !view && <Button variant="primary" icon="edit" onClick={() => setEditing(true)}>Edit rules</Button>} />
-      {!apiMode && <DemoNote what="The Constitution is versioned and published by admins." />}
+      {!apiMode && <DemoNote what="The real Constitution is versioned and published by admins on the server." />}
       {apiMode && live.error && <ErrorNote msg={live.error} onRetry={live.reload} />}
       <div className="split">
-        <Section title={view ? `Version ${view}` : apiMode && live.data ? `Version ${live.data.version} · in force` : "Mandatory rules"}
-          sub={view ? "An earlier version, kept for the record." : "Non-negotiable. Every Build Contract carries these first."}
-          actions={view ? <Button size="sm" variant="ghost" onClick={() => setView(null)}>Back to current</Button> : undefined}>
-          <ol className="hq-rules">
-            {shown.map(r => <li key={r.id}><code className="cid">{r.id}</code><span>{r.text}</span></li>)}
-          </ol>
-          {apiMode && live.loading && <div className="panel-body muted">Loading…</div>}
-        </Section>
+        <div className="hq-glow" data-glow={view ? "off" : "on"}>
+          <Section title={view ? `Version ${view}` : apiMode && live.data ? `Version ${live.data.version} · in force` : "Mandatory rules"}
+            sub={view ? "An earlier version, kept for the record." : "Non-negotiable. Every Build Contract carries these first."}
+            actions={view ? <Button size="sm" variant="ghost" onClick={() => setView(null)}>Back to current</Button> : undefined}>
+            <RuleGroup title="Engineering rules" rules={core} />
+            {slop.length > 0 && <RuleGroup title="AI slop blockers" tone="slop" rules={slop}
+              intro="Company-wide. They apply to every engineer and every AI builder on every component, on top of the rules above." />}
+            {apiMode && live.loading && <div className="panel-body muted">Loading…</div>}
+          </Section>
+        </div>
         <div className="stack-v">
           <Section title="How it is enforced" className="hq-aside">
             <div className="panel-body hq-prose">
@@ -98,15 +102,27 @@ export function Constitution() {
   );
 }
 
+function RuleGroup({ title, rules, tone, intro }: { title: string; rules: G.ConstitutionRule[]; tone?: "slop"; intro?: string }) {
+  return (
+    <div className={cx("hq-rulegroup", tone && "is-" + tone)}>
+      <h3 className="hq-rulegroup-h">{title} <small>{rules.length}</small></h3>
+      {intro && <p className="hq-rulegroup-intro">{intro}</p>}
+      <ol className="hq-rules">
+        {rules.map(r => <li key={r.id}><code className="cid">{r.id}</code><span>{r.text}</span></li>)}
+      </ol>
+    </div>
+  );
+}
+
 function EditConstitution({ current, onClose, onSaved }: { current: G.Constitution; onClose: () => void; onSaved: (c: G.Constitution) => void }) {
-  const [rows, setRows] = useState<{ id?: string; text: string }[]>(current.rules.map(r => ({ ...r })));
+  const [rows, setRows] = useState<{ id?: string; text: string; group?: "core" | "ai_slop" }[]>(current.rules.map(r => ({ ...r })));
   const [note, setNote] = useState("");
   const [err, setErr] = useState<G.Problems | null>(null);
   const [busy, setBusy] = useState(false);
   const removed = current.rules.filter(r => !rows.some(x => x.id === r.id)).map(r => r.id);
   const save = async () => {
     setBusy(true); setErr(null);
-    try { onSaved(await G.publishConstitution(rows.filter(r => r.text.trim()), note)); }
+    try { onSaved(await G.publishConstitution(rows.filter(r => r.text.trim()).map(r => ({ id: r.id, text: r.text, group: r.group ?? "core" })), note)); }
     catch (e) { setErr(G.apiProblems(e)); } finally { setBusy(false); }
   };
   return (
@@ -116,13 +132,14 @@ function EditConstitution({ current, onClose, onSaved }: { current: G.Constituti
         <ol className="hq-edit-rules">
           {rows.map((r, i) => (
             <li key={r.id ?? `new-${i}`}>
-              <code className="cid">{r.id ?? "new"}</code>
+              <span><code className="cid">{r.id ?? "new"}</code>{r.group === "ai_slop" && <small className="hq-tag-slop">AI slop</small>}</span>
               <textarea rows={2} value={r.text} aria-label={`Rule ${r.id ?? "new"}`} onChange={e => setRows(rows.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} />
               <Button size="sm" variant="ghost" icon="trash" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove rule" />
             </li>
           ))}
         </ol>
-        <div><Button size="sm" icon="plus" onClick={() => setRows([...rows, { text: "" }])}>Add rule</Button></div>
+        <div className="row"><Button size="sm" icon="plus" onClick={() => setRows([...rows, { text: "" }])}>Add rule</Button>
+          <Button size="sm" icon="plus" onClick={() => setRows([...rows, { text: "", group: "ai_slop" }])}>Add AI slop blocker</Button></div>
         <Field label="What changed and why" full hint={removed.length ? `Required: you are removing ${removed.join(", ")}.` : "Optional unless a rule is removed."}>
           <textarea rows={2} value={note} onChange={e => setNote(e.target.value)} />
         </Field>
@@ -150,7 +167,7 @@ export function Templates() {
       <PageHeader eyebrow="Governance" title="Component templates"
         sub="Every component is specified against one template, so each one answers the same questions. Editing a template publishes a new version. Components keep the version they were written against."
         actions={apiMode && isAdmin && <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>New template</Button>} />
-      {!apiMode && <DemoNote what="Templates are versioned and managed by admins." />}
+      {!apiMode && <DemoNote what="Real templates are versioned and managed by admins on the server." />}
       {apiMode && list.error && <ErrorNote msg={list.error} onRetry={list.reload} />}
       <div className="split">
         <Section title={apiMode ? cur?.name ?? "Template" : "Apex Component Engineering Spec"}
@@ -162,7 +179,8 @@ export function Templates() {
               <tr key={s.key}>
                 <td className="hq-first"><b style={{ fontWeight: 600 }}>{s.label}</b><br /><code className="cid">{s.key}</code></td>
                 <td data-label="Required">{s.required ? <Pill tone="brand">Required</Pill> : <Pill tone="faint">Optional</Pill>}</td>
-                <td className="muted" data-label="Guidance">{s.hint || "—"}</td>
+                <td className="muted" data-label="Guidance">{s.hint || "—"}
+                  {s.boilerplate && <details className="hq-baseline"><summary>Baseline sent with every component</summary><pre className="hq-pre">{s.boilerplate}</pre></details>}</td>
               </tr>))}</tbody>
           </table></div>
         </Section>
@@ -180,6 +198,7 @@ export function Templates() {
           )}
           <Section title="What a template can and cannot do"><div className="panel-body hq-prose">
             <p>Admins can relabel sections, mark them required, change the guidance and add new sections. The ten core sections cannot be removed, so no component loses the ability to describe its architecture, guardrails or acceptance criteria.</p>
+            <p>A section can carry baseline text. That text goes to the AI builder on every component using the template, ahead of the component's own content. Components add specifics beside it. They cannot edit or remove it.</p>
             <p>Sections that already live on a component, such as its description or architecture, keep using those fields. Nothing is copied or overwritten.</p>
           </div></Section>
         </div>
@@ -206,6 +225,9 @@ function SectionEditor({ rows, setRows }: { rows: G.TemplateSection[]; setRows: 
               </span></div>
             <input type="text" value={r.label} aria-label="Section label" onChange={e => set(i, { label: e.target.value })} />
             <input type="text" value={r.hint} aria-label="Guidance" placeholder="Guidance for whoever fills this in" onChange={e => set(i, { hint: e.target.value })} />
+            <textarea rows={r.boilerplate ? 6 : 2} value={r.boilerplate ?? ""} aria-label="Baseline text" maxLength={4000}
+              placeholder="Optional baseline text. Sent to the AI builder on every component that uses this template. Components can add to it but cannot remove it."
+              onChange={e => set(i, { boilerplate: e.target.value })} />
           </div>
         );
       })}
@@ -457,6 +479,7 @@ function SpecPanel({ cid, c }: { cid: number; c: Component }) {
                 {canEdit && editKey !== sec.key && <Button size="sm" variant="ghost" icon="edit" onClick={() => { setEditKey(sec.key); setDraft(sec.content ?? ""); setErr(""); }}>Edit</Button>}
                 {!canEdit && sec.admin_only && sec.storage !== "derived" && <span className="muted" style={{ fontSize: 12 }}><Icon name="lock" size={12} /> Admins edit this</span>}
               </header>
+              {sec.boilerplate && <details className="hq-baseline"><summary>Template baseline (applies to every component, set by admins)</summary><pre className="hq-pre">{sec.boilerplate}</pre></details>}
               {editKey === sec.key ? (
                 <div className="stack-v" style={{ gap: 8 }}>
                   <textarea rows={7} value={draft} onChange={e => setDraft(e.target.value)} aria-label={sec.label} />
@@ -489,7 +512,8 @@ function ContractPanel({ cid }: { cid: number }) {
       <div className="panel-body stack-v">
         <dl className="hq-facts">
           <div><dt>Constitution</dt><dd>Version {c.trusted.constitution.version} · {c.trusted.constitution.rules.length} rules</dd></div>
-          <div><dt>Template</dt><dd>{c.template.name ?? "Default"} {c.template.version ? `v${c.template.version}` : ""}</dd></div>
+          <div><dt>AI slop blockers</dt><dd>{c.trusted.constitution.rules.filter(r => r.group === "ai_slop").length} company-wide</dd></div>
+          <div><dt>Template</dt><dd>{c.template.name ?? "Default"} {c.template.version ? `v${c.template.version}` : ""} · {(c.trusted.template_baseline ?? []).length} baseline section{(c.trusted.template_baseline ?? []).length === 1 ? "" : "s"}</dd></div>
           <div><dt>Contract fingerprint</dt><dd><code>{c.content_hash.slice(0, 12)}</code> <span className="muted">changes when the specification, template or Constitution changes</span></dd></div>
           <div><dt>Acceptance criteria</dt><dd>{c.untrusted.acceptance_criteria.length}</dd></div>
         </dl>

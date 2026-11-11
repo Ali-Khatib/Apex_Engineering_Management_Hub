@@ -3024,3 +3024,37 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
   .hq-crit li { flex-direction: column; align-items: stretch; gap: 8px; }
   .hq-crit select { width: 100%; }
 }
+
+/* ── Engineering Constitution: breathing glow ─────────────────────────
+   The glow is a blurred halo on a pseudo-element whose opacity is the only
+   thing animated, so it stays on the compositor. 5.2s in, 5.2s out. Reduced
+   motion gets a still, mid-strength halo. */
+:root { --hq-glow: 8, 122, 67; --hq-glow-a: .34; }
+:root[data-theme="dark"] { --hq-glow: 117, 216, 45; --hq-glow-a: .30; }
+.hq-glow { position: relative; border-radius: var(--r-lg); isolation: isolate; min-width: 0; }
+.hq-glow::before { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(var(--hq-glow), .55), 0 0 22px 1px rgba(var(--hq-glow), var(--hq-glow-a)), 0 0 64px 6px rgba(var(--hq-glow), calc(var(--hq-glow-a) * .6));
+  opacity: .25; animation: hq-breathe 5.2s ease-in-out infinite alternate; }
+.hq-glow[data-glow="off"]::before { animation: none; opacity: 0; }
+@keyframes hq-breathe { from { opacity: .25; } to { opacity: 1; } }
+.side-item.hq-breathe { position: relative; isolation: isolate; }
+.side-item.hq-breathe::before { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(117,216,45,.5), 0 0 16px 1px rgba(117,216,45,.38), inset 0 0 14px rgba(117,216,45,.14);
+  opacity: .2; animation: hq-breathe 5.2s ease-in-out infinite alternate; }
+.side-item.hq-breathe .ic { color: var(--lime); }
+@media (prefers-reduced-motion: reduce) {
+  .hq-glow::before, .side-item.hq-breathe::before { animation: none; opacity: .6; }
+}
+.hq-rulegroup + .hq-rulegroup { border-top: 1px solid var(--line); margin-top: 4px; }
+.hq-rulegroup-h { margin: 0; padding: 16px 20px 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--fg); display: flex; align-items: baseline; gap: 8px; }
+.hq-rulegroup-h small { font-weight: 500; color: var(--fg-3); }
+.hq-rulegroup-intro { margin: 4px 20px 0; font-size: 13px; color: var(--fg-3); line-height: 1.45; }
+.hq-rulegroup.is-slop .hq-rulegroup-h { color: var(--brand-ink); }
+.hq-rulegroup.is-slop .hq-rules .cid { color: var(--brand-ink); }
+.hq-tag-slop { margin-left: 6px; font-size: 11px; color: var(--brand-ink); font-weight: 600; }
+.hq-baseline { margin: 6px 0 10px; font-size: 13px; }
+.hq-baseline summary { cursor: pointer; color: var(--brand-ink); max-width: 100%; overflow-wrap: anywhere; }
+.hq-baseline summary:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.hq-baseline .hq-pre { margin-top: 8px; max-height: 280px; overflow: auto; white-space: pre-wrap; }
+.hq-edit-rules li > span { padding-top: 10px; display: flex; flex-wrap: wrap; align-items: baseline; }
+.hq-edit-rules li > span .cid { padding-top: 0; }

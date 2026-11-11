@@ -9,12 +9,35 @@ from .config import REQUIRE_COMPLIANCE_REVIEW
 def seed_governance(db: Session):
     """Insert the first Constitution and the default template if absent. Idempotent."""
     if not db.scalar(select(m.ConstitutionVersion).limit(1)):
-        db.add(m.ConstitutionVersion(version=1, rules=g.constitution_rules_v1(), note="Initial Apex Engineering Constitution"))
+        db.add(m.ConstitutionVersion(version=1, rules=g.constitution_rules(), note="Initial Apex Engineering Constitution, with AI slop blockers"))
     if not db.scalar(select(m.ComponentTemplate).limit(1)):
         t = m.ComponentTemplate(name=g.DEFAULT_TEMPLATE_NAME, is_default=True, current_version=1,
                                 description="The standard specification every component is written against.")
         db.add(t); db.flush()
         db.add(m.ComponentTemplateVersion(template_id=t.id, version=1, sections=g.DEFAULT_SECTIONS, note="Initial version"))
+    db.commit()
+    upgrade_defaults(db)
+
+
+def upgrade_defaults(db: Session):
+    """Bring a database seeded before the AI slop work up to the current defaults.
+
+    Only an untouched default is upgraded: the in-force Constitution must still
+    be version 1 with exactly the original fourteen rules, and the default
+    template must still be version 1 with exactly the original ten sections.
+    Anything an admin has already changed is left alone. Each upgrade is a new
+    version, so the history shows it and the old version stays readable.
+    """
+    cur = db.scalar(select(m.ConstitutionVersion).order_by(m.ConstitutionVersion.version.desc()).limit(1))
+    if cur and cur.version == 1 and [r.get("text") for r in cur.rules] == g.CONSTITUTION_V1:
+        db.add(m.ConstitutionVersion(version=2, rules=g.constitution_rules(), note="Added the company-wide AI slop blockers (R15 to R26)"))
+    t = db.scalar(select(m.ComponentTemplate).where(m.ComponentTemplate.is_default == True))  # noqa
+    if t and t.current_version == 1:
+        v = db.scalar(select(m.ComponentTemplateVersion).where(m.ComponentTemplateVersion.template_id == t.id, m.ComponentTemplateVersion.version == 1))
+        if v and [s.get("key") for s in v.sections] == g.LEGACY_DEFAULT_KEYS and not any(s.get("boilerplate") for s in v.sections):
+            db.add(m.ComponentTemplateVersion(template_id=t.id, version=2, sections=g.DEFAULT_SECTIONS,
+                                              note="Added Component AI baseline and Component AI slop defender, with baseline text"))
+            t.current_version = 2
     db.commit()
 
 

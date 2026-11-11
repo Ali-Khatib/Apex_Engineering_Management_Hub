@@ -105,11 +105,41 @@ content.
 
 ## Apex Engineering Constitution
 
-Fourteen mandatory rules (R01 to R14), versioned and append-only. Publishing a
+Fourteen engineering rules (R01 to R14) and twelve company-wide AI slop blockers
+(R15 to R26, `group: "ai_slop"`), versioned and append-only. Publishing a
 new version is admin-only. Removing a rule needs a written reason of at least 10
 characters. Old versions stay readable.
 
 `GET /api/constitution`, `GET /api/constitution/{version}`, `PUT /api/constitution`.
+
+### AI slop blockers
+
+R15 to R26 apply to every engineer and every AI builder on every component:
+no filler or placeholder content, no invented references, no decorative code,
+no swallowed failures, no theatre tests, no unverifiable claims, no generic
+output, no unrequested rewrites, no duplicated logic, no unvetted dependencies,
+no silent guessing, and no AI-written change the owner has not read.
+
+These are drafted as proposed defaults for Apex admins to review and edit. They
+are not a statement of an existing Apex policy. A new database is seeded with
+all 26 rules as version 1. A database still on the untouched original
+fourteen is moved to version 2 on startup, and the history records it. A
+Constitution an admin has already changed is left alone.
+
+## Component AI baseline and slop defender
+
+The default template has two further sections, **Component AI baseline** and
+**Component AI slop defender**. A section can carry `boilerplate` text, owned by
+admins and versioned with the template. Every contract copies it into
+`trusted.template_baseline`, and the rendered prompt places it before the
+component content. A component cannot edit or remove it. What the component
+writes in those sections (the files to read first, the slop likely on that
+component) stays in the untrusted block beside it. The baseline text is part of
+the contract fingerprint, so editing it makes earlier reviews stale.
+
+A component explicitly pinned to an older template version keeps that version
+until an admin moves it. The default template is upgraded the same way as the
+Constitution: only if it is still the untouched version 1.
 
 ## AI Build Contract
 
@@ -117,7 +147,7 @@ characters. Old versions stay readable.
 
 The contract has two blocks that are never mixed:
 
-- `trusted`: the current Constitution and a fixed platform policy. Written by
+- `trusted`: the current Constitution, a fixed platform policy and the template baseline. Written by
   the server from code and the Constitution table. No component field can edit
   or remove them.
 - `untrusted`: the component's own content (requirements, guardrails, AI
@@ -192,7 +222,9 @@ application will not run against a database that has not been migrated.
 - Team: with a backend, a directory with department filter, profile drawer
   (private fields shown only when allowed), add and edit forms with per-field
   errors, deactivate and reactivate. Without one, the original demo page.
-- Reference: Engineering Constitution and Component templates pages.
+- Reference: Engineering Constitution and Component templates pages. The Constitution
+  page and its sidebar entry have a slow breathing glow (5.2 seconds each way, opacity
+  only). With reduced motion on, it is a still halo.
 - Component page: a Spec and contract tab with the specification, the Build
   Contract (copyable prompt) and the compliance review.
 - Without a backend these pages show a labelled read-only demo copy and nothing
@@ -203,7 +235,7 @@ application will not run against a database that has not been migrated.
 Run:
 
 - Pure-logic tests (`backend/tests/test_profiles.py`, `test_governance_logic.py`):
-  52 tests covering validation, template rules, contract assembly, delimiter
+  58 tests covering validation, template rules, contract assembly, delimiter
   neutralisation, hashing and compliance evaluation.
 - Frontend production bundle, and the existing browser audits (layout bounds,
   route sweep, contrast, accessibility) over every route including the new ones.
@@ -214,7 +246,9 @@ Run:
 Not run in the environment that wrote this, because the Python packages could
 not be installed there:
 
-- `backend/tests/test_apex_hq_api.py` and the existing `test_workflow.py`.
+- `backend/tests/test_apex_hq_api.py` (including the slop blocker and baseline
+  contract test) and the existing `test_workflow.py`.
+- The startup upgrade of an older database (`upgrade_defaults`).
 - `alembic upgrade head`, `alembic check`, downgrade, and any PostgreSQL run.
 
 Run them before merging:

@@ -7,7 +7,7 @@ def user_out(u, private=False):
     if not u: return None
     d = {"id": u.id, "first_name": u.first_name, "last_name": u.last_name, "email": u.email, "role": u.role,
          "title": u.title, "designation": u.title, "onboarding_notes": u.onboarding_notes,
-         "department": u.department or "", "github_id": u.github_id or "", "website_url": u.website_url or "",
+         "department": u.department or "", "manager_id": u.manager_id, "github_id": u.github_id or "", "website_url": u.website_url or "",
          "is_active": bool(u.is_active), "created_at": u.created_at, "updated_at": u.updated_at}
     if private:
         d.update({"phone": u.phone or "", "linkedin_url": u.linkedin_url or "", "vpn_id": u.vpn_id or ""})

@@ -55,6 +55,7 @@ class UserPatch(BaseModel):
     department: str | None = None; email: str | None = None; phone: str | None = None
     linkedin_url: str | None = None; vpn_id: str | None = None; github_id: str | None = None
     website_url: str | None = None; role: str | None = None; onboarding_notes: str | None = None
+    manager_id: int | None = None
 class SelfPatch(BaseModel):
     phone: str | None = None; linkedin_url: str | None = None; github_id: str | None = None; website_url: str | None = None
 
@@ -112,6 +113,16 @@ def patch_user(uid: int, b: UserPatch, db: Session = Depends(get_db), admin=Depe
     if "title" in data and "designation" not in data: data["designation"] = data.pop("title")
     data.pop("title", None)
     role = data.pop("role", None); notes = data.pop("onboarding_notes", None)
+    set_manager = "manager_id" in data; manager_id = data.pop("manager_id", None)
+    if set_manager:
+        if manager_id is not None:
+            mgr = db.get(m.User, manager_id)
+            if not mgr or not mgr.is_active: raise HTTPException(422, "The manager must be an active user")
+            if mgr.id == u.id: raise HTTPException(422, "A person cannot be their own manager")
+            seen, cur = {u.id}, mgr
+            while cur is not None:                      # refuse a loop: nobody may manage their own manager
+                if cur.id in seen: raise HTTPException(422, "That would create a reporting loop")
+                seen.add(cur.id); cur = db.get(m.User, cur.manager_id) if cur.manager_id else None
     if role is not None and role not in ("admin", "member"): raise HTTPException(422, "role must be admin|member")
     if u.id == admin.id and role == "member": raise HTTPException(409, "Admins cannot demote themselves")
     if role == "member" and u.role == "admin" and u.is_active and _active_admins(db) <= 1: raise HTTPException(409, "At least one active admin is required")
@@ -120,7 +131,8 @@ def patch_user(uid: int, b: UserPatch, db: Session = Depends(get_db), admin=Depe
     _apply_profile(u, clean)
     if role is not None: u.role = role
     if notes is not None: u.onboarding_notes = notes
-    changed = sorted(clean) + (["role"] if role is not None else []) + (["onboarding_notes"] if notes is not None else [])
+    if set_manager: u.manager_id = manager_id
+    changed = sorted(clean) + (["role"] if role is not None else []) + (["onboarding_notes"] if notes is not None else []) + (["manager"] if set_manager else [])
     audit(db, admin, "user.update", f"{u.email}: {', '.join(changed)}"); db.commit(); return s.user_out(u, private=True)
 
 @router.post("/users/{uid}/deactivate")

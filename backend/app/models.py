@@ -26,6 +26,9 @@ class User(Base):
     # Accounts are deactivated, never deleted: components, comments and the
     # audit log point at them.
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Reporting line, used by People cases. Not a permission: being someone's manager
+    # gives access to that person's onboarding/offboarding case and nothing else.
+    manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=now, nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=now, onupdate=now, nullable=True)
 
@@ -314,3 +317,167 @@ class ComplianceReview(Base):
     decided_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     decision_note: Mapped[str] = mapped_column(Text, default="")
+
+
+# ───────────────────────── People / HR ─────────────────────────
+# Source of truth: HQ owns case, task, approval and candidate state. External
+# systems (ERP, VPN, Slack, Calendar, contracts) are not connected; a task bound
+# to one records a manual confirmation, never a fake integration result.
+
+class HrCandidate(Base):
+    """A person invited to the assessment. May later be linked to a user without losing history."""
+    __tablename__ = "hr_candidates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(160))
+    email: Mapped[str] = mapped_column(String(200), index=True)
+    role_title: Mapped[str] = mapped_column(String(160), default="")
+    linkedin_url: Mapped[str] = mapped_column(String(500), default="")
+    stage: Mapped[str] = mapped_column(String(20), default="invited", index=True)  # invited | assessment_open | submitted | approved | rejected | cancelled
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    assessment_title: Mapped[str] = mapped_column(String(200), default="")
+    assessment_brief: Mapped[str] = mapped_column(Text, default="")
+    assessment_instructions: Mapped[str] = mapped_column(Text, default="")
+    assessment_hours: Mapped[int] = mapped_column(Integer, default=48)
+    first_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # starts at first sign-in, server clock
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)   # set when they become a user
+    decided_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decision_reason: Mapped[str] = mapped_column(Text, default="")   # restricted
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+class HrCandidateAccess(Base):
+    """One invitation link and one-time code. Both are stored only as keyed hashes."""
+    __tablename__ = "hr_candidate_access"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(ForeignKey("hr_candidates.id", ondelete="CASCADE"), index=True)
+    invitation_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    issued_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    code_expires_at: Mapped[datetime] = mapped_column(DateTime)
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    issued_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+class HrCandidateSession(Base):
+    __tablename__ = "hr_candidate_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(ForeignKey("hr_candidates.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+class HrSubmission(Base):
+    """At most one per candidate. Text and repository links only; uploads are not accepted."""
+    __tablename__ = "hr_submissions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(ForeignKey("hr_candidates.id", ondelete="CASCADE"), unique=True)
+    operation_id: Mapped[str] = mapped_column(String(80))
+    notes: Mapped[str] = mapped_column(Text, default="")
+    repository_url: Mapped[str] = mapped_column(String(500), default="")
+    linkedin_url: Mapped[str] = mapped_column(String(500), default="")
+    checksum: Mapped[str] = mapped_column(String(64))
+    receipt_id: Mapped[str] = mapped_column(String(40), unique=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+class HrTemplate(Base):
+    """Editable checklist for a kind of case. Cases copy it at creation, so editing never rewrites a live case."""
+    __tablename__ = "hr_templates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), unique=True)   # onboarding | offboarding
+    name: Mapped[str] = mapped_column(String(160))
+    tasks: Mapped[list] = mapped_column(JSON, default=list)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+class HrCase(Base):
+    __tablename__ = "hr_cases"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)    # onboarding | offboarding
+    person_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    candidate_id: Mapped[int | None] = mapped_column(ForeignKey("hr_candidates.id"), nullable=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(200))       # kept so history still reads if the person is later renamed
+    role_title: Mapped[str] = mapped_column(String(160), default="")
+    department: Mapped[str] = mapped_column(String(120), default="")
+    manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    anchor_date: Mapped[date | None] = mapped_column(Date, nullable=True)   # start date, or last working date
+    stage: Mapped[str] = mapped_column(String(20), default="awaiting_approval", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    template_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason_category: Mapped[str] = mapped_column(String(80), default="")   # restricted: admins only
+    restricted_notes: Mapped[str] = mapped_column(Text, default="")        # restricted: admins only
+    approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    closed_reason: Mapped[str] = mapped_column(Text, default="")
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+class HrTask(Base):
+    __tablename__ = "hr_tasks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("hr_cases.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    key: Mapped[str] = mapped_column(String(40))
+    title: Mapped[str] = mapped_column(String(200))
+    instructions: Mapped[str] = mapped_column(Text, default="")
+    category: Mapped[str] = mapped_column(String(80), default="General")
+    required: Mapped[bool] = mapped_column(Boolean, default=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="not_started")
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    integration: Mapped[str] = mapped_column(String(20), default="none")
+    confirmation: Mapped[str] = mapped_column(String(24), default="not_applicable")
+    confirmed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    evidence_note: Mapped[str] = mapped_column(Text, default="")
+    blocked_reason: Mapped[str] = mapped_column(Text, default="")
+    skip_reason: Mapped[str] = mapped_column(Text, default="")
+    completed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    system_key: Mapped[str | None] = mapped_column(String(20), nullable=True)   # "handover": completes itself
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+class HrHandoverItem(Base):
+    """Something the departing person holds in engineering. Added from live assignments, never deleted."""
+    __tablename__ = "hr_handover_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("hr_cases.id", ondelete="CASCADE"), index=True)
+    component_id: Mapped[int] = mapped_column(ForeignKey("components.id"), index=True)
+    blocker_id: Mapped[int | None] = mapped_column(ForeignKey("blockers.id"), nullable=True)
+    role: Mapped[str] = mapped_column(String(10))               # owner | reviewer | qa | blocker
+    from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    to_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(12), default="pending")   # pending | reassigned | accepted | exception
+    exception_reason: Mapped[str] = mapped_column(Text, default="")
+    decided_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    accepted_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    component = relationship("Component", lazy="joined")
+
+class HrEvent(Base):
+    """HR history. Kept apart from the general audit feed, which every member can read."""
+    __tablename__ = "hr_events"
+    __table_args__ = (UniqueConstraint("case_id", "request_id"), UniqueConstraint("candidate_id", "request_id"))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int | None] = mapped_column(ForeignKey("hr_cases.id", ondelete="CASCADE"), nullable=True, index=True)
+    candidate_id: Mapped[int | None] = mapped_column(ForeignKey("hr_candidates.id", ondelete="CASCADE"), nullable=True, index=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    action: Mapped[str] = mapped_column(String(40))
+    from_stage: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    to_stage: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    detail: Mapped[str] = mapped_column(Text, default="")
+    sensitive: Mapped[bool] = mapped_column(Boolean, default=False)   # detail shown to admins only
+    request_id: Mapped[str | None] = mapped_column(String(80), nullable=True)   # makes a retried request a no-op
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now, index=True)
+    actor = relationship("User", lazy="joined")

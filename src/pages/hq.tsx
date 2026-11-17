@@ -13,8 +13,9 @@ import { Button, PageHeader, Section, Pill, Avatar, Modal, Drawer, Field, Empty,
 import { fmtDate } from "../logic";
 import type { Component } from "../types";
 import * as G from "../governance";
+import * as HR from "../hr";
 
-const useLoad = <T,>(fn: () => Promise<T>, deps: React.DependencyList) => {
+export const useLoad = <T,>(fn: () => Promise<T>, deps: React.DependencyList) => {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -33,7 +34,7 @@ const useLoad = <T,>(fn: () => Promise<T>, deps: React.DependencyList) => {
 const DemoNote = ({ what }: { what: string }) => (
   <div className="hq-note" role="status"><Icon name="info" size={15} /><span>Demo copy. {what} Nothing here can be changed or saved until the backend is connected.</span></div>
 );
-const ErrorNote = ({ msg, onRetry }: { msg: string; onRetry?: () => void }) => (
+export const ErrorNote = ({ msg, onRetry }: { msg: string; onRetry?: () => void }) => (
   <div className="hq-note hq-note-crit" role="alert"><Icon name="alert" size={15} /><span>{msg}</span>{onRetry && <Button size="sm" variant="ghost" onClick={onRetry}>Try again</Button>}</div>
 );
 const when = (s: string | null | undefined) => (s ? fmtDate(s.slice(0, 10)) : "—");
@@ -293,6 +294,9 @@ export function PeopleDirectory() {
   const [open, setOpen] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const list = useLoad(() => G.hqUsers(isAdmin && showInactive), [isAdmin, showInactive]);
+  // Lifecycle is its own thing, apart from login access. A person is only listed here if a case you may see says they are not simply active.
+  const life = useLoad(() => HR.lifecycle().catch(() => [] as HR.LifecycleRow[]), []);
+  const lifeOf = (id: number) => (life.data ?? []).find(l => l.user_id === id);
   const people = list.data ?? [];
   const depts = useMemo(() => [...new Set(people.map(p => p.department).filter(Boolean))].sort(), [people]);
   const shown = people.filter(p => (!dept || p.department === dept) &&
@@ -313,7 +317,7 @@ export function PeopleDirectory() {
       <section className="panel" style={{ overflow: "hidden" }}>
         {!list.loading && shown.length === 0 ? <Empty icon="team" title="Nobody matches" /> :
           <div className="table-wrap"><table className="tbl hq-tbl">
-            <thead><tr><th>Person</th><th>Department</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+            <thead><tr><th>Person</th><th>Department</th><th>Email</th><th>Role</th><th>Login</th><th>Lifecycle</th></tr></thead>
             <tbody>{shown.map(p => (
               <tr key={p.id} className="clickable" onClick={() => setOpen(p.id)}>
                 <td className="hq-first"><span className="row" style={{ gap: 10, flexWrap: "nowrap" }}><Avatar p={asPerson(p)} size={32} />
@@ -321,7 +325,8 @@ export function PeopleDirectory() {
                 <td data-label="Department">{p.department || <span className="muted">—</span>}</td>
                 <td data-label="Email"><CopyText text={p.email} /></td>
                 <td data-label="Role"><Pill tone={p.role === "admin" ? "brand" : "faint"}>{p.role === "admin" ? "Admin" : "Member"}</Pill></td>
-                <td data-label="Status">{p.is_active ? <Pill tone="ok" dot>Active</Pill> : <Pill tone="faint">Deactivated</Pill>}</td>
+                <td data-label="Login">{p.is_active ? <Pill tone="ok" dot>Active</Pill> : <Pill tone="faint">Deactivated</Pill>}</td>
+                <td data-label="Lifecycle">{lifeOf(p.id) ? <a className="hq-link" href="#people" onClick={e => e.stopPropagation()}><Pill tone="warn">{lifeOf(p.id)!.lifecycle_label}</Pill></a> : <span className="muted">—</span>}</td>
               </tr>))}</tbody>
           </table></div>}
       </section>
@@ -386,6 +391,8 @@ function PersonForm({ user, selfOnly, onClose, onSaved }: { user?: G.HqUser; sel
   const [err, setErr] = useState<Record<string, string>>({});
   const [top, setTop] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mgr, setMgr] = useState<number | null>(user?.manager_id ?? null);
+  const everyone = useLoad(() => (user && !selfOnly ? G.hqUsers(false) : Promise.resolve([] as G.HqUser[])), [user?.id, selfOnly]);
   const set = (k: keyof G.NewHqUser) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   const save = async () => {
     setBusy(true); setErr({}); setTop("");
@@ -393,7 +400,7 @@ function PersonForm({ user, selfOnly, onClose, onSaved }: { user?: G.HqUser; sel
       let saved: G.HqUser;
       if (creating) saved = await G.createHqUser(f);
       else if (selfOnly) saved = await G.updateMyContact({ phone: f.phone, linkedin_url: f.linkedin_url, github_id: f.github_id, website_url: f.website_url });
-      else { const { password: _p, ...patch } = f; saved = await G.updateHqUser(user!.id, patch); }
+      else { const { password: _p, ...patch } = f; saved = await G.updateHqUser(user!.id, { ...patch, manager_id: mgr }); }
       onSaved(saved);
     } catch (e) { const pr = G.apiProblems(e); setErr(pr.fields); setTop(Object.keys(pr.fields).length ? "" : pr.message); }
     finally { setBusy(false); }
@@ -415,6 +422,7 @@ function PersonForm({ user, selfOnly, onClose, onSaved }: { user?: G.HqUser; sel
         <Field label="GitHub ID" error={err.github_id} hint="Optional"><input type="text" value={f.github_id} onChange={set("github_id")} /></Field>
         <Field label="Personal website" error={err.website_url} hint="Optional"><input type="url" value={f.website_url} onChange={set("website_url")} placeholder="https://" /></Field>
         {!selfOnly && <Field label="Role"><select value={f.role} onChange={set("role")}><option value="member">Member</option><option value="admin">Admin</option></select></Field>}
+        {!creating && !selfOnly && <Field label="Manager" error={err.manager_id} hint="A manager can see this person's onboarding and offboarding cases."><select value={mgr ?? ""} onChange={e => setMgr(e.target.value ? Number(e.target.value) : null)}><option value="">No manager</option>{(everyone.data ?? []).filter(p => p.id !== user!.id).map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select></Field>}
         {creating && <Field label="Initial password" error={err.password} hint="At least 12 characters. Share it privately; they should change it."><input type="password" autoComplete="new-password" value={f.password} onChange={set("password")} /></Field>}
       </div>
       {top && <ErrorNote msg={top} />}

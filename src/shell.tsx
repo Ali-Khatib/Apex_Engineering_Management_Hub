@@ -157,6 +157,13 @@ export const NAV = [
     { id: "blockers", label: "Blockers", sub: "Work that has stopped, and who can unstick it", icon: "blockers" },
     { id: "qa", label: "QA reviews", sub: "What is waiting on a QA decision", icon: "readiness" },
   ] },
+  { group: "People", items: [
+    { id: "people", label: "People overview", sub: "Who is joining, who is leaving, and what needs a person to act", icon: "mywork" },
+    { id: "team", label: "Directory", sub: "People, profiles and what they own", icon: "team" },
+    { id: "candidates", label: "Candidates", sub: "Assessment invitations and decisions", icon: "readiness" },
+    { id: "onboarding", label: "Onboarding", sub: "Getting a new person ready to work", icon: "plus" },
+    { id: "offboarding", label: "Offboarding", sub: "Handing over work and closing out safely", icon: "handoff" },
+  ] },
   { group: "Planning", items: [
     { id: "roadmap", label: "Roadmap", sub: "What is selected for now, next and later", icon: "plan" },
     { id: "map", label: "Dependencies", sub: "Loops that need a decision before work can be sequenced", icon: "graph" },
@@ -168,11 +175,10 @@ export const NAV = [
     { id: "practices", label: "Best practices", sub: "How we agreed to build", icon: "practices" },
     { id: "constitution", label: "Engineering Constitution", sub: "The rules every engineer and AI builder follows", icon: "shield" },
     { id: "templates", label: "Component templates", sub: "The structure every component spec follows", icon: "file" },
-    { id: "team", label: "Team", sub: "People, profiles and what they own", icon: "team" },
     { id: "about", label: "About & contacts", sub: "What Apex does, and who to ask", icon: "about" },
   ] },
 ];
-export const routeBase = (r: string) => r.startsWith("c-") ? "library" : r.startsWith("m-") ? "architecture" : r.startsWith("p-") ? "practices" : r === "" || r === "overview" ? "home" : r;
+export const routeBase = (r: string) => r.startsWith("onb-") ? "onboarding" : r.startsWith("off-") ? "offboarding" : r.startsWith("cand-") ? "candidates" : r.startsWith("c-") ? "library" : r.startsWith("m-") ? "architecture" : r.startsWith("p-") ? "practices" : r === "" || r === "overview" ? "home" : r;
 
 /** Pages reachable outside the sidebar, so the breadcrumb can still name them. */
 export const OFF_NAV: Record<string, string> = { settings: "Settings" };
@@ -215,7 +221,7 @@ export function Topbar({ onSearch, onMenu }: { onSearch: () => void; onMenu: () 
   const { toast } = useToast();
   const base = routeBase(route);
   const section = NAV.flatMap(g => g.items).find(i => i.id === base);
-  const leaf = route.startsWith("c-") ? component(route.slice(2))?.id : route.startsWith("m-") ? route.slice(2) : route.startsWith("p-") ? state.practices.find(p => p.id === route.slice(2))?.title : null;
+  const leaf = /^(onb|off|cand)-/.test(route) ? (route.startsWith("cand-") ? "Candidate " : "Case ") + route.split("-")[1] : route.startsWith("c-") ? component(route.slice(2))?.id : route.startsWith("m-") ? route.slice(2) : route.startsWith("p-") ? state.practices.find(p => p.id === route.slice(2))?.title : null;
   const mine = state.notices.filter(n => n.to === me?.id);
   const unread = mine.filter(n => !n.read).length;
   return (

@@ -62,3 +62,5 @@ src/
 ## Governance and people
 
 Templates, the Engineering Constitution, AI Build Contracts, compliance reviews and the user directory are described in [docs/apex-hq-governance.md](docs/apex-hq-governance.md).
+
+People (onboarding, offboarding, candidate assessments, engineering handover) is described in [docs/people-hr.md](docs/people-hr.md).

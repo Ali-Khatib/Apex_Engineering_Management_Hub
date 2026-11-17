@@ -10,6 +10,8 @@ from .db import SessionLocal
 from .api import router
 from .governance_api import router as governance_router
 from .governance_service import seed_governance
+from .hr_api import router as hr_router, candidate_router
+from .hr_service import seed_hr
 from .config import STATIC_DIR, DESIGNS_DIR
 from .events import set_loop
 from .seed import seed
@@ -29,10 +31,14 @@ async def lifespan(app):
     with SessionLocal() as db:
         seed(db)
         seed_governance(db)
+        seed_hr(db)
     yield
 
 app = FastAPI(title="Apex HQ", version="0.2", lifespan=lifespan)
 app.include_router(router)
+app.include_router(governance_router)
+app.include_router(hr_router)
+app.include_router(candidate_router)
 
 @app.get("/api/health")
 def health(): return {"ok": True}

@@ -22,6 +22,8 @@ import { QA } from "./pages/qa";
 import { Knowledge } from "./pages/knowledge";
 import { Architecture } from "./pages/architecture";
 import { Constitution, Templates } from "./pages/hq";
+import { PeopleOverview, CaseListPage, CasePage, CandidatesPage, CandidatePage } from "./pages/people";
+import { CandidatePortal } from "./pages/candidate";
 
 class Boundary extends React.Component<{ children: React.ReactNode; resetKey: string }, { err: Error | null }> {
   state = { err: null as Error | null };
@@ -38,6 +40,10 @@ function Route() {
   if (route.startsWith("c-")) return <ComponentPage key={route} id={route.slice(2)} />;
   if (route.startsWith("m-")) return <ModulePage key={route} id={route.slice(2)} />;
   if (route.startsWith("p-")) return <PracticePage key={route} id={route.slice(2)} />;
+  const num = (r: string) => Number(r.slice(r.indexOf("-") + 1));
+  if (/^onb-\d+$/.test(route)) return <CasePage key={route} id={num(route)} kind="onboarding" />;
+  if (/^off-\d+$/.test(route)) return <CasePage key={route} id={num(route)} kind="offboarding" />;
+  if (/^cand-\d+$/.test(route)) return <CandidatePage key={route} id={num(route)} />;
   switch (route) {
     case "modules": case "architecture": return <Architecture />;
     case "library": case "components": return <Components />;
@@ -52,6 +58,10 @@ function Route() {
     case "practices": return <Practices />;
     case "about": return <About />;
     case "team": return <Team />;
+    case "people": return <PeopleOverview />;
+    case "onboarding": return <CaseListPage kind="onboarding" />;
+    case "offboarding": return <CaseListPage kind="offboarding" />;
+    case "candidates": return <CandidatesPage />;
     case "constitution": return <Constitution />;
     case "templates": return <Templates />;
     default: return <Home />;
@@ -72,6 +82,8 @@ function Shell() {
     };
     window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
   }, []);
+  // The candidate page is public and has no HQ shell. It must render before the sign-in gate.
+  if (route === "candidate" || route.startsWith("candidate=")) return <CandidatePortal />;
   if (!me) return <SignIn />;
   return (
     <div className="shell">
@@ -80,7 +92,7 @@ function Shell() {
       <div className="shell-main">
         <Topbar onSearch={() => setPalette(true)} onMenu={() => setMenu(true)} />
         {apiMode && <div className="sync-note" role="status" style={{ borderRadius: 0 }}>
-          Component fields, owner, reviewer and QA assignments, dependencies, links, comments, blockers, review requests, QA decisions and deployment gates save to the backend. The Engineering Constitution, component templates, specifications, AI Build Contracts and compliance reviews are stored and checked by the backend. Other workspace sections remain demo data. Per-criterion evidence, handoffs, code-review decisions and architecture uploads are not saved.
+          Component fields, owner, reviewer and QA assignments, dependencies, links, comments, blockers, review requests, QA decisions and deployment gates save to the backend. The Engineering Constitution, component templates, specifications, AI Build Contracts and compliance reviews are stored and checked by the backend. People (onboarding, offboarding, candidate assessments and their checklists) is stored and enforced by the backend, and no external system such as ERP, VPN or Slack is connected. Other workspace sections remain demo data. Per-criterion evidence, handoffs, code-review decisions and architecture uploads are not saved.
         </div>}
         <main className="page" key={route.startsWith("c-") ? "c" : route}>
           <Boundary resetKey={route}><Route /></Boundary>
@@ -92,7 +104,7 @@ function Shell() {
 }
 
 function App() {
-  const [intro, setIntro] = useState(() => { try { return sessionStorage.getItem("apex-intro-v2") !== "1"; } catch { return true; } });
+  const [intro, setIntro] = useState(() => { if (location.hash.startsWith("#candidate")) return false; try { return sessionStorage.getItem("apex-intro-v2") !== "1"; } catch { return true; } });
   return (
     <ThemeProvider>
       <ToastProvider>

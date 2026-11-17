@@ -9,7 +9,7 @@ import { api, ApiError } from "./api";
 export interface HqUser {
   id: number; first_name: string; last_name: string; email: string; role: "admin" | "member";
   designation: string; department: string; github_id: string; website_url: string;
-  is_active: boolean; created_at: string | null; updated_at: string | null; onboarding_notes: string;
+  is_active: boolean; created_at: string | null; updated_at: string | null; onboarding_notes: string; manager_id?: number | null;
   /** Present only when the signed-in person is an admin or this is their own record. */
   phone?: string; linkedin_url?: string; vpn_id?: string;
 }
@@ -17,7 +17,7 @@ export interface NewHqUser {
   first_name: string; last_name: string; designation: string; department: string; email: string; phone: string;
   linkedin_url: string; vpn_id: string; github_id: string; website_url: string; role: "admin" | "member"; password: string;
 }
-export type HqUserPatch = Partial<Omit<NewHqUser, "password">>;
+export type HqUserPatch = Partial<Omit<NewHqUser, "password">> & { manager_id?: number | null };
 
 export interface ConstitutionRule { id: string; text: string; group?: "core" | "ai_slop" }
 export interface Constitution {

@@ -21,7 +21,7 @@ const ROLE_LABEL: Record<string, string> = { owner: "Owner", reviewer: "Reviewer
 function DemoBanner() {
   const { apiMode } = useStore();
   if (apiMode) return null;
-  return <div className="hq-note" role="status"><Icon name="info" size={15} /><span><b>Sample data.</b> The people and cases below are invented, to show how People works. Nothing can be changed or saved until the backend is connected.</span></div>;
+  return <div className="hq-note" role="status"><Icon name="info" size={15} /><span><b>Sample data.</b> The people and cases below are invented, to show how HR works. Nothing can be changed or saved until the backend is connected.</span></div>;
 }
 
 function useAdminPeople() {
@@ -51,7 +51,7 @@ export function PeopleOverview() {
   );
   return (
     <>
-      <PageHeader title="People overview" sub={d?.scope === "yours" ? "The onboarding and offboarding cases you own, manage or have tasks in." : "Every onboarding and offboarding case, and what needs a person to act."}
+      <PageHeader title="HR overview" sub={d?.scope === "yours" ? "The onboarding and offboarding cases you own, manage or have tasks in." : "Every onboarding and offboarding case, and what needs a person to act."}
         actions={d?.can.start && <><Button variant="secondary" icon="plus" onClick={() => setInvite(true)}>Invite a candidate</Button><Button variant="secondary" icon="plus" onClick={() => setStart("offboarding")}>Start offboarding</Button><Button variant="primary" icon="plus" onClick={() => setStart("onboarding")}>Start onboarding</Button></>} />
       <DemoBanner />
       {ov.error && <ErrorNote msg={ov.error} onRetry={ov.reload} />}
@@ -197,7 +197,7 @@ export function CasePage({ id, kind }: { id: number; kind: H.Kind }) {
   const groups = tasks.reduce<Record<string, H.Task[]>>((a, t) => { (a[t.category] ||= []).push(t); return a; }, {});
   return (
     <>
-      <PageHeader eyebrow={<><a href={"#people"}>People</a> / <a href={"#" + kind}>{kind === "onboarding" ? "Onboarding" : "Offboarding"}</a></>} title={d.person.name}
+      <PageHeader eyebrow={<><a href={"#hr"}>HR</a> / <a href={"#" + kind}>{kind === "onboarding" ? "Onboarding" : "Offboarding"}</a></>} title={d.person.name}
         sub={[d.role_title, d.department].filter(Boolean).join(" · ") || undefined}
         actions={d.actions && <>{d.actions.map(a => <span key={a.action} title={a.enabled ? undefined : a.why.join(" ")}><Button variant={a.action === "approve" || a.action === "complete" ? "primary" : "secondary"} disabled={!a.enabled && !a.why.length} onClick={() => setDialog({ kind: "action", a })} aria-disabled={!a.enabled}>{a.label}</Button></span>)}</>}>
         <div className="row pp-meta"><Pill tone={STAGE_TONE[d.stage]} dot>{d.stage_label}</Pill>{d.overdue > 0 && <Pill tone="warn">{d.overdue} overdue</Pill>}{d.blocked > 0 && <Pill tone="crit">{d.blocked} blocked</Pill>}</div>
@@ -482,7 +482,7 @@ export function CandidatePage({ id }: { id: number }) {
   if (c.error && !c.data) return <><PageHeader title="Candidate not found" /><Empty icon="team" title="No such candidate"><a href="#candidates">Back to candidates</a></Empty></>;
   const d = c.data; if (!d) return <PageHeader title="Loading…" />;
   return <>
-    <PageHeader eyebrow={<><a href="#people">People</a> / <a href="#candidates">Candidates</a></>} title={d.name} sub={`${d.email}${d.role_title ? " · " + d.role_title : ""}`}
+    <PageHeader eyebrow={<><a href="#hr">HR</a> / <a href="#candidates">Candidates</a></>} title={d.name} sub={`${d.email}${d.role_title ? " · " + d.role_title : ""}`}
       actions={<>{d.actions.map(a => <Button key={a.action} variant={a.action === "approve" ? "primary" : "secondary"} onClick={() => setAct(a)} disabled={!a.enabled}>{a.label}</Button>)}
         {d.stage === "approved" && !d.onboarding_case_id && <Button variant="primary" icon="arrowRight" onClick={() => setStart(true)}>Start onboarding</Button>}
         {d.onboarding_case_id && <a className="btn btn-secondary btn-md" href={"#onb-" + d.onboarding_case_id}>Open onboarding case</a>}</>}>

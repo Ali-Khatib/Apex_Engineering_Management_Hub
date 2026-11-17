@@ -1,5 +1,5 @@
 /**
- * Client for People / HR. Every call needs the backend; nothing here is stored in the browser.
+ * Client for HR. Every call needs the backend; nothing here is stored in the browser.
  * The only browser storage involved is the HQ sign-in token (api.ts). A candidate's session token
  * lives in memory only and is gone on refresh.
  */

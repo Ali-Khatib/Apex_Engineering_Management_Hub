@@ -1,4 +1,4 @@
-"""Database-facing People / HR logic: loads rows, applies the pure rules in hr.py,
+"""Database-facing HR logic: loads rows, applies the pure rules in hr.py,
 enforces who may see and change what, and writes history.
 
 Permission model (existing roles only):

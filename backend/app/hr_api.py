@@ -1,4 +1,4 @@
-"""HTTP surface for People / HR. Staff routes live under /api/hr and need an HQ sign-in.
+"""HTTP surface for HR. Staff routes live under /api/hr and need an HQ sign-in.
 Candidate routes live under /api/candidate and use a separate session header, never an HQ token.
 Every handler asks hr_service for access, so a direct URL, a list, a count and a mutation all share one rule."""
 from datetime import date

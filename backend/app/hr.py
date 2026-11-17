@@ -1,4 +1,4 @@
-"""People / HR rules for Apex HQ: onboarding, offboarding, candidate review.
+"""HR rules for Apex HQ: onboarding, offboarding, candidate review.
 
 Pure functions only. No framework, database or clock imports: callers pass in
 plain values (and `now` where time matters), so every rule here is testable on

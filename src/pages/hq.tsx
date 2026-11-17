@@ -326,7 +326,7 @@ export function PeopleDirectory() {
                 <td data-label="Email"><CopyText text={p.email} /></td>
                 <td data-label="Role"><Pill tone={p.role === "admin" ? "brand" : "faint"}>{p.role === "admin" ? "Admin" : "Member"}</Pill></td>
                 <td data-label="Login">{p.is_active ? <Pill tone="ok" dot>Active</Pill> : <Pill tone="faint">Deactivated</Pill>}</td>
-                <td data-label="Lifecycle">{lifeOf(p.id) ? <a className="hq-link" href="#people" onClick={e => e.stopPropagation()}><Pill tone="warn">{lifeOf(p.id)!.lifecycle_label}</Pill></a> : <span className="muted">—</span>}</td>
+                <td data-label="Lifecycle">{lifeOf(p.id) ? <a className="hq-link" href="#hr" onClick={e => e.stopPropagation()}><Pill tone="warn">{lifeOf(p.id)!.lifecycle_label}</Pill></a> : <span className="muted">—</span>}</td>
               </tr>))}</tbody>
           </table></div>}
       </section>

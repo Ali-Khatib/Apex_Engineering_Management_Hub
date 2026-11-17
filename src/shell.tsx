@@ -157,9 +157,9 @@ export const NAV = [
     { id: "blockers", label: "Blockers", sub: "Work that has stopped, and who can unstick it", icon: "blockers" },
     { id: "qa", label: "QA reviews", sub: "What is waiting on a QA decision", icon: "readiness" },
   ] },
-  { group: "People", items: [
-    { id: "people", label: "People overview", sub: "Who is joining, who is leaving, and what needs a person to act", icon: "mywork" },
-    { id: "team", label: "Directory", sub: "People, profiles and what they own", icon: "team" },
+  { group: "HR", items: [
+    { id: "hr", label: "HR overview", sub: "Who is joining, who is leaving, and what needs a person to act", icon: "mywork" },
+    { id: "team", label: "Directory", sub: "Everyone on Apex HQ, their profiles and what they own", icon: "team" },
     { id: "candidates", label: "Candidates", sub: "Assessment invitations and decisions", icon: "readiness" },
     { id: "onboarding", label: "Onboarding", sub: "Getting a new person ready to work", icon: "plus" },
     { id: "offboarding", label: "Offboarding", sub: "Handing over work and closing out safely", icon: "handoff" },

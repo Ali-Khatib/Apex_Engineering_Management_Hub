@@ -1,5 +1,5 @@
 /**
- * Sample People data for the hosted demo, which has no backend. Invented names, read-only, and labelled as sample
+ * Sample HR data for the hosted demo, which has no backend. Invented names, read-only, and labelled as sample
  * wherever it is shown. It is never used when a backend is configured.
  */
 const ref = (id: number, name: string) => ({ id, name });

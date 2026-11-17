@@ -58,7 +58,7 @@ function Route() {
     case "practices": return <Practices />;
     case "about": return <About />;
     case "team": return <Team />;
-    case "people": return <PeopleOverview />;
+    case "hr": case "people": return <PeopleOverview />;
     case "onboarding": return <CaseListPage kind="onboarding" />;
     case "offboarding": return <CaseListPage kind="offboarding" />;
     case "candidates": return <CandidatesPage />;
@@ -92,7 +92,7 @@ function Shell() {
       <div className="shell-main">
         <Topbar onSearch={() => setPalette(true)} onMenu={() => setMenu(true)} />
         {apiMode && <div className="sync-note" role="status" style={{ borderRadius: 0 }}>
-          Component fields, owner, reviewer and QA assignments, dependencies, links, comments, blockers, review requests, QA decisions and deployment gates save to the backend. The Engineering Constitution, component templates, specifications, AI Build Contracts and compliance reviews are stored and checked by the backend. People (onboarding, offboarding, candidate assessments and their checklists) is stored and enforced by the backend, and no external system such as ERP, VPN or Slack is connected. Other workspace sections remain demo data. Per-criterion evidence, handoffs, code-review decisions and architecture uploads are not saved.
+          Component fields, owner, reviewer and QA assignments, dependencies, links, comments, blockers, review requests, QA decisions and deployment gates save to the backend. The Engineering Constitution, component templates, specifications, AI Build Contracts and compliance reviews are stored and checked by the backend. HR (onboarding, offboarding, candidate assessments and their checklists) is stored and enforced by the backend, and no external system such as ERP, VPN or Slack is connected. Other workspace sections remain demo data. Per-criterion evidence, handoffs, code-review decisions and architecture uploads are not saved.
         </div>}
         <main className="page" key={route.startsWith("c-") ? "c" : route}>
           <Boundary resetKey={route}><Route /></Boundary>

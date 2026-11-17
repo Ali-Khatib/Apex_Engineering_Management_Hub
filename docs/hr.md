@@ -1,12 +1,12 @@
-# People (onboarding, offboarding, candidates)
+# HR (onboarding, offboarding, candidates)
 
-People is a native part of Apex HQ. It reuses the HQ sign-in, the HQ users and the HQ design system. It is not a second app. Everything below is stored and enforced by the backend. The browser keeps no HR data; the only thing in browser storage is the existing HQ sign-in token.
+HR is a native part of Apex HQ. It reuses the HQ sign-in, the HQ users and the HQ design system. It is not a second app. Everything below is stored and enforced by the backend. The browser keeps no HR data; the only thing in browser storage is the existing HQ sign-in token.
 
 ## Where things are
 
 | Page | Route | Who |
 |---|---|---|
-| People overview | `#people` | Everyone. Counts and the "Needs attention" list are scoped to what the viewer may see. |
+| HR overview | `#hr` | Everyone. Counts and the "Needs attention" list are scoped to what the viewer may see. |
 | Directory | `#team` | Everyone. Adds a Lifecycle column, separate from Login. |
 | Candidates | `#candidates`, `#cand-<id>` | Admins |
 | Onboarding | `#onboarding`, `#onb-<id>` | Case owners, managers, task owners, admins |

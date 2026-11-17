@@ -17,14 +17,11 @@ const SYSTEM_LABEL: Record<string, string> = { erp: "ERP", vpn: "VPN", slack: "S
 const HANDOVER_LABEL: Record<string, string> = { pending: "Needs a replacement", reassigned: "Replacement chosen", accepted: "Accepted", exception: "Left as it is, on record" };
 const ROLE_LABEL: Record<string, string> = { owner: "Owner", reviewer: "Reviewer", qa: "QA contact", blocker: "Blocker" };
 
-/** Everything here is stored and checked by the backend. Without one there is nothing real to show. */
-function NeedsBackend({ title }: { title: string }) {
-  return (<>
-    <PageHeader title={title} />
-    <Empty icon="team" title="People needs the backend">
-      Onboarding, offboarding and candidate assessments keep their records, approvals and history on the server. This copy of Apex HQ is running without one, so there is nothing to show and nothing is made up.
-    </Empty>
-  </>);
+/** Shown on the hosted demo, which has no backend. The data is invented and nothing can be changed. */
+function DemoBanner() {
+  const { apiMode } = useStore();
+  if (apiMode) return null;
+  return <div className="hq-note" role="status"><Icon name="info" size={15} /><span><b>Sample data.</b> The people and cases below are invented, to show how People works. Nothing can be changed or saved until the backend is connected.</span></div>;
 }
 
 function useAdminPeople() {
@@ -47,8 +44,7 @@ export function PeopleOverview() {
   const { go } = useNav();
   const [start, setStart] = useState<H.Kind | null>(null);
   const [invite, setInvite] = useState(false);
-  const ov = useLoad(() => (apiMode ? H.overview() : Promise.resolve(null)), [apiMode]);
-  if (!apiMode) return <NeedsBackend title="People overview" />;
+  const ov = useLoad(() => H.overview(), []);
   const d = ov.data;
   const kpi = (label: string, value: number, to: string, tone?: string) => (
     <button className={cx("kpi", tone && value > 0 && `kpi-${tone}`)} onClick={() => go(to)}><span className="kpi-label">{label}</span><span className="kpi-value">{value}</span><span className="kpi-foot">View</span></button>
@@ -57,6 +53,7 @@ export function PeopleOverview() {
     <>
       <PageHeader title="People overview" sub={d?.scope === "yours" ? "The onboarding and offboarding cases you own, manage or have tasks in." : "Every onboarding and offboarding case, and what needs a person to act."}
         actions={d?.can.start && <><Button variant="secondary" icon="plus" onClick={() => setInvite(true)}>Invite a candidate</Button><Button variant="secondary" icon="plus" onClick={() => setStart("offboarding")}>Start offboarding</Button><Button variant="primary" icon="plus" onClick={() => setStart("onboarding")}>Start onboarding</Button></>} />
+      <DemoBanner />
       {ov.error && <ErrorNote msg={ov.error} onRetry={ov.reload} />}
       {d && <>
         <div className="kpis pp-kpis">
@@ -98,16 +95,16 @@ export function CaseListPage({ kind }: { kind: H.Kind }) {
   const [f, setF] = useState({ stage: "active", q: "", overdue: false, blocked: false, sort: "newest", page: 1 });
   const [start, setStart] = useState(false);
   const [tpl, setTpl] = useState(false);
-  const list = useLoad(() => (apiMode ? H.cases({ kind, ...f, per: 15 }) : Promise.resolve(null)), [apiMode, kind, f.stage, f.q, f.overdue, f.blocked, f.sort, f.page]);
+  const list = useLoad(() => H.cases({ kind, ...f, per: 15 }), [kind, f.stage, f.q, f.overdue, f.blocked, f.sort, f.page]);
   useEffect(() => setF(x => ({ ...x, page: 1 })), [kind]);
   const title = kind === "onboarding" ? "Onboarding" : "Offboarding";
-  if (!apiMode) return <NeedsBackend title={title} />;
   const d = list.data; const pages = d ? Math.max(1, Math.ceil(d.total / d.per)) : 1;
   const set = (p: Partial<typeof f>) => setF(x => ({ ...x, page: 1, ...p }));
   return (
     <>
       <PageHeader title={title} sub={kind === "onboarding" ? "Getting a new person ready to work: approval, accounts, equipment and a first plan." : "Handing over a person's work and closing their access safely."}
         actions={isAdmin && <><Button variant="ghost" icon="edit" onClick={() => setTpl(true)}>Edit checklist</Button><Button variant="primary" icon="plus" onClick={() => setStart(true)}>Start {kind}</Button></>} />
+      <DemoBanner />
       <div className="toolbar">
         <div className="input-ic grow"><Icon name="search" size={15} /><input type="search" placeholder="Search by person, role or department" value={f.q} onChange={e => set({ q: e.target.value })} aria-label="Search cases" /></div>
         <select value={f.stage} onChange={e => set({ stage: e.target.value })} aria-label="Stage">
@@ -190,9 +187,8 @@ export function CasePage({ id, kind }: { id: number; kind: H.Kind }) {
   const { go } = useNav();
   const { toast } = useToast();
   const [tab, setTab] = useState("tasks");
-  const c = useLoad(() => (apiMode ? H.getCase(id) : Promise.resolve(null)), [apiMode, id]);
+  const c = useLoad(() => H.getCase(id), [id]);
   const [dialog, setDialog] = useState<{ kind: "action"; a: H.CaseAction } | { kind: "task"; t: H.Task; mode: string } | { kind: "item"; i: H.HandoverItem; mode: string } | { kind: "addtask" } | null>(null);
-  if (!apiMode) return <NeedsBackend title="Case" />;
   if (c.error && !c.data) return <><PageHeader title="Case not found" /><Empty icon="team" title="You can't open this case">It may not exist, or it may belong to someone else's responsibility. <a href={"#" + kind}>Back to {kind}</a>.</Empty></>;
   const d = c.data; if (!d) return <PageHeader title="Loading…" />;
   if (d.kind !== kind) return <Empty icon="team" title="Wrong list"><a href={"#" + (d.kind === "onboarding" ? "onb-" : "off-") + d.id}>Open this case</a></Empty>;
@@ -206,6 +202,7 @@ export function CasePage({ id, kind }: { id: number; kind: H.Kind }) {
         actions={d.actions && <>{d.actions.map(a => <span key={a.action} title={a.enabled ? undefined : a.why.join(" ")}><Button variant={a.action === "approve" || a.action === "complete" ? "primary" : "secondary"} disabled={!a.enabled && !a.why.length} onClick={() => setDialog({ kind: "action", a })} aria-disabled={!a.enabled}>{a.label}</Button></span>)}</>}>
         <div className="row pp-meta"><Pill tone={STAGE_TONE[d.stage]} dot>{d.stage_label}</Pill>{d.overdue > 0 && <Pill tone="warn">{d.overdue} overdue</Pill>}{d.blocked > 0 && <Pill tone="crit">{d.blocked} blocked</Pill>}</div>
       </PageHeader>
+      <DemoBanner />
       {c.error && <ErrorNote msg={c.error} onRetry={c.reload} />}
       <div className={cx("hq-note", d.blockers_to_complete?.length ? "hq-note-warn" : "")} role="status"><Icon name="info" size={15} /><span><b>Where this stands.</b> {d.status_text}</span></div>
       {d.actions?.some(a => !a.enabled && a.why.length) && d.stage !== "completed" && d.stage !== "cancelled" && d.blockers_to_complete && d.blockers_to_complete.length > 0 && (
@@ -421,12 +418,12 @@ export function CandidatesPage() {
   const { apiMode, isAdmin } = useStore();
   const { go } = useNav();
   const [q, setQ] = useState(""); const [st, setSt] = useState(""); const [inv, setInv] = useState(false);
-  const list = useLoad(() => (apiMode && isAdmin ? H.candidates() : Promise.resolve(null)), [apiMode, isAdmin]);
-  if (!apiMode) return <NeedsBackend title="Candidates" />;
+  const list = useLoad(() => (isAdmin ? H.candidates() : Promise.resolve(null)), [isAdmin]);
   if (!isAdmin) return <><PageHeader title="Candidates" /><Empty icon="shield" title="Admins only">Candidate assessments and decisions are limited to admins.</Empty></>;
   const rows = (list.data?.items ?? []).filter(c => (!st || c.view === st) && (!q || `${c.name} ${c.email}`.toLowerCase().includes(q.toLowerCase())));
   return <>
     <PageHeader title="Candidates" sub="People invited to an assessment. Approving one lets you start their onboarding without entering them again." actions={<Button variant="primary" icon="plus" onClick={() => setInv(true)}>Invite a candidate</Button>} />
+    <DemoBanner />
     <div className="toolbar"><div className="input-ic grow"><Icon name="search" size={15} /><input type="search" placeholder="Search by name or email" value={q} onChange={e => setQ(e.target.value)} aria-label="Search candidates" /></div>
       <select value={st} onChange={e => setSt(e.target.value)} aria-label="Stage"><option value="">All stages</option><option value="invited">Invited</option><option value="assessment_open">Assessment open</option><option value="expired">Window ended</option><option value="submitted">Submitted</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option></select></div>
     {list.error && <ErrorNote msg={list.error} onRetry={list.reload} />}
@@ -476,12 +473,11 @@ function InviteCandidate({ onClose, onDone }: { onClose: () => void; onDone: () 
 export function CandidatePage({ id }: { id: number }) {
   const { apiMode, isAdmin } = useStore();
   const { toast } = useToast();
-  const c = useLoad(() => (apiMode && isAdmin ? H.candidate(id) : Promise.resolve(null)), [apiMode, isAdmin, id]);
+  const c = useLoad(() => (isAdmin ? H.candidate(id) : Promise.resolve(null)), [isAdmin, id]);
   const [act, setAct] = useState<{ action: string; label: string; needs_reason: boolean } | null>(null);
   const [access, setAccess] = useState<H.Access | null>(null);
   const [start, setStart] = useState(false);
   const { go } = useNav();
-  if (!apiMode) return <NeedsBackend title="Candidate" />;
   if (!isAdmin) return <><PageHeader title="Candidate" /><Empty icon="shield" title="Admins only" /></>;
   if (c.error && !c.data) return <><PageHeader title="Candidate not found" /><Empty icon="team" title="No such candidate"><a href="#candidates">Back to candidates</a></Empty></>;
   const d = c.data; if (!d) return <PageHeader title="Loading…" />;
@@ -492,6 +488,7 @@ export function CandidatePage({ id }: { id: number }) {
         {d.onboarding_case_id && <a className="btn btn-secondary btn-md" href={"#onb-" + d.onboarding_case_id}>Open onboarding case</a>}</>}>
       <div className="row pp-meta"><Pill tone={CAND_TONE[d.view]} dot>{d.stage_label}</Pill></div>
     </PageHeader>
+    <DemoBanner />
     {access && <AccessBox a={access} />}
     <div className="pp-grid"><div style={{ minWidth: 0 }}>
       <Section title="Assessment" sub={d.assessment_title}><div className="panel-body"><p className="pp-pre">{d.assessment_brief}</p>{d.assessment_instructions && <><h3 className="pp-h3">Instructions</h3><p className="pp-pre">{d.assessment_instructions}</p></>}</div></Section>

@@ -3,7 +3,8 @@
  * The only browser storage involved is the HQ sign-in token (api.ts). A candidate's session token
  * lives in memory only and is gone on refresh.
  */
-import { api } from "./api";
+import { api as realApi, apiEnabled, ApiError } from "./api";
+import { demoRoute } from "./hrDemo";
 
 export type Kind = "onboarding" | "offboarding";
 export interface Ref { id: number; name: string }
@@ -63,6 +64,12 @@ export interface PersonContext {
 }
 export interface EngRow { id: number; code: string; name: string; status: string; historical: boolean }
 
+/** With a backend, a normal call. Without one, read-only sample data, and every change is refused plainly. */
+async function api<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+  if (apiEnabled()) return realApi<T>(path, opts as any);
+  if (opts.method && opts.method !== "GET") throw new ApiError(0, "This is sample data. Nothing can be changed or saved until the backend is connected.");
+  try { return demoRoute(path) as T; } catch (e: any) { throw new ApiError(e.status || 404, e.message); }
+}
 export const newRequestId = () => (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 const qs = (o: Record<string, unknown>) => { const p = new URLSearchParams(); Object.entries(o).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "" && v !== false) p.set(k, String(v)); }); const s = p.toString(); return s ? "?" + s : ""; };
 
